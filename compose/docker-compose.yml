@@ -2,11 +2,11 @@
 # with the per-session values (token, passwords, maxplayers, map, mode).
 services:
   cs2:
-    # TODO(review): `:latest` + pull_policy always = an unreviewed image every boot.
-    # Pin a digest (joedwards32/cs2@sha256:...) and bump it deliberately.
-    image: joedwards32/cs2:latest
+    # Pinned deliberately — bump by re-checking https://hub.docker.com/r/joedwards32/cs2/tags
+    # and updating the digest below. CS2 itself still self-updates every boot (steamcmd,
+    # independent of this image); this only pins the wrapper/entry.sh version.
+    image: joedwards32/cs2@sha256:2e6b059560f9786e5eca1f683e6fe0073b5c1343afca38e0da096b1e0f83f5fc
     container_name: cs2
-    pull_policy: always
     env_file:
       - .env
     environment:

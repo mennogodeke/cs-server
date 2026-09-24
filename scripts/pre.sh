@@ -24,6 +24,23 @@ GAMEMODE="${CS2_GAMEMODE:-matchzy}"
 
 _pre_log() { echo "[pre.sh] $*"; }
 
+# _verify_sha256 FILE EXPECTED_SHA256
+#   Fails (non-zero) on a mismatch. An empty EXPECTED_SHA256 (unpinned in
+#   versions.lock) is a warning, not a failure, so bumping a version without
+#   its checksum yet doesn't hard-block the server.
+_verify_sha256() {
+  local file="$1" expected="$2" actual
+  if [[ -z "$expected" ]]; then
+    _pre_log "WARNING: no checksum pinned for $file, skipping verification"
+    return 0
+  fi
+  actual="$(sha256sum "$file" | awk '{print $1}')"
+  if [[ "$actual" != "$expected" ]]; then
+    _pre_log "WARNING: checksum mismatch for $file (expected $expected, got $actual)"
+    return 1
+  fi
+}
+
 _metamod_registered() {
   grep -qF 'csgo/addons/metamod' "$GAMEINFO" 2>/dev/null
 }
@@ -138,16 +155,14 @@ else
   else
     all_ok=1
 
-    # TODO(review): none of the downloads below are integrity-checked. Add a sha256
-    # per artifact to versions.lock and `sha256sum -c` before extracting — these
-    # run inside the game server with access to its secrets.
     if [[ -n "${METAMOD_BUILD:-}" ]]; then
       _pre_log "installing Metamod build ${METAMOD_BUILD}"
       if curl -fsSL "https://github.com/alliedmodders/metamod-source/releases/download/2.0.0.${METAMOD_BUILD}/mmsource-2.0.0-git${METAMOD_BUILD}-linux.tar.gz" -o /tmp/metamod.tar.gz \
+        && _verify_sha256 /tmp/metamod.tar.gz "${METAMOD_SHA256:-}" \
         && tar xzf /tmp/metamod.tar.gz -C csgo; then
         rm -f /tmp/metamod.tar.gz
       else
-        _pre_log "WARNING: Metamod download/extract failed — leaving existing install (if any) untouched"
+        _pre_log "WARNING: Metamod download/verify/extract failed — leaving existing install (if any) untouched"
         all_ok=0
       fi
     fi
@@ -156,10 +171,11 @@ else
       _pre_log "installing CounterStrikeSharp ${COUNTERSTRIKESHARP}"
       cssharp_ver="${COUNTERSTRIKESHARP#v}"
       if curl -fsSL "https://github.com/roflmuffin/CounterStrikeSharp/releases/download/${COUNTERSTRIKESHARP}/counterstrikesharp-with-runtime-linux-${cssharp_ver}.zip" -o /tmp/cssharp.zip \
+        && _verify_sha256 /tmp/cssharp.zip "${COUNTERSTRIKESHARP_SHA256:-}" \
         && unzip -oq /tmp/cssharp.zip -d csgo; then
         rm -f /tmp/cssharp.zip
       else
-        _pre_log "WARNING: CounterStrikeSharp download/extract failed — leaving existing install (if any) untouched"
+        _pre_log "WARNING: CounterStrikeSharp download/verify/extract failed — leaving existing install (if any) untouched"
         all_ok=0
       fi
     fi
@@ -167,10 +183,11 @@ else
     if [[ "$GAMEMODE" == "matchzy" && -n "${MATCHZY:-}" ]]; then
       _pre_log "installing MatchZy ${MATCHZY}"
       if curl -fsSL "https://github.com/shobhit-pathak/MatchZy/releases/download/${MATCHZY}/MatchZy-${MATCHZY}.zip" -o /tmp/matchzy.zip \
+        && _verify_sha256 /tmp/matchzy.zip "${MATCHZY_SHA256:-}" \
         && unzip -oq /tmp/matchzy.zip -d csgo; then
         rm -f /tmp/matchzy.zip
       else
-        _pre_log "WARNING: MatchZy download/extract failed — leaving existing install (if any) untouched"
+        _pre_log "WARNING: MatchZy download/verify/extract failed — leaving existing install (if any) untouched"
         all_ok=0
       fi
     fi
@@ -178,10 +195,11 @@ else
     if [[ "$GAMEMODE" == "prophunt" && -n "${MULTIADDONMANAGER:-}" ]]; then
       _pre_log "installing MultiAddonManager ${MULTIADDONMANAGER}"
       if curl -fsSL "https://github.com/Source2ZE/MultiAddonManager/releases/download/${MULTIADDONMANAGER}/MultiAddonManager-${MULTIADDONMANAGER}-steamrt3.tar.gz" -o /tmp/mam.tar.gz \
+        && _verify_sha256 /tmp/mam.tar.gz "${MULTIADDONMANAGER_SHA256:-}" \
         && tar xzf /tmp/mam.tar.gz -C csgo; then
         rm -f /tmp/mam.tar.gz
       else
-        _pre_log "WARNING: MultiAddonManager download/extract failed — leaving existing install (if any) untouched"
+        _pre_log "WARNING: MultiAddonManager download/verify/extract failed — leaving existing install (if any) untouched"
         all_ok=0
       fi
     fi
@@ -194,10 +212,11 @@ else
       menumgr_num="${CS2MENUMANAGER#v1.0.}"
       mkdir -p csgo/addons/counterstrikesharp
       if curl -fsSL "https://github.com/schwarper/CS2MenuManager/releases/download/${CS2MENUMANAGER}/CS2MenuManager-v${menumgr_num}.zip" -o /tmp/menumgr.zip \
+        && _verify_sha256 /tmp/menumgr.zip "${CS2MENUMANAGER_SHA256:-}" \
         && unzip -oq /tmp/menumgr.zip -d csgo/addons/counterstrikesharp; then
         rm -f /tmp/menumgr.zip
       else
-        _pre_log "WARNING: CS2MenuManager download/extract failed — leaving existing install (if any) untouched"
+        _pre_log "WARNING: CS2MenuManager download/verify/extract failed — leaving existing install (if any) untouched"
         all_ok=0
       fi
     fi
@@ -206,10 +225,11 @@ else
       _pre_log "installing PropHunt ${PROPHUNT}"
       mkdir -p csgo/addons/counterstrikesharp
       if curl -fsSL "https://github.com/exkludera-cssharp/PropHunt/releases/download/${PROPHUNT}/PropHunt_${PROPHUNT}.zip" -o /tmp/prophunt.zip \
+        && _verify_sha256 /tmp/prophunt.zip "${PROPHUNT_SHA256:-}" \
         && unzip -oq /tmp/prophunt.zip -d csgo/addons/counterstrikesharp; then
         rm -f /tmp/prophunt.zip
       else
-        _pre_log "WARNING: PropHunt download/extract failed — leaving existing install (if any) untouched"
+        _pre_log "WARNING: PropHunt download/verify/extract failed — leaving existing install (if any) untouched"
         all_ok=0
       fi
     fi

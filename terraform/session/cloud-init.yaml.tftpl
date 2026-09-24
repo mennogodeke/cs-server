@@ -99,18 +99,30 @@ runcmd:
     chown -R 1000:1000 /opt/cs2/data
 
   # --- join the tailnet: admin SSH/RCON reach this host by name, never a public port ---
-  # TODO(review): the key is reusable, so a leak = anyone can join the tailnet. Create
-  # it with a tag (e.g. tag:cs2) and add a tailnet ACL so that tag can reach nothing.
-  # TODO(review): curl | sh here and for Docker below — consider the apt repos with
-  # pinned signing keys instead.
-  - curl -fsSL https://tailscale.com/install.sh | sh
+  # Installed from Tailscale's official apt repo (signed, not curl | sh); the
+  # codename is read from /etc/os-release so this keeps working if the base
+  # image is ever bumped off debian-12/bookworm.
+  - |
+    . /etc/os-release
+    curl -fsSL "https://pkgs.tailscale.com/stable/debian/$${VERSION_CODENAME}.noarmor.gpg" -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+    curl -fsSL "https://pkgs.tailscale.com/stable/debian/$${VERSION_CODENAME}.tailscale-keyring.list" | tee /etc/apt/sources.list.d/tailscale.list
+    apt-get update
+    apt-get install -y tailscale
   - |
     set +x
     tailscale up --authkey=${tailscale_authkey} --hostname=cs2-session
     set -x
 
-  # --- install Docker from the official convenience script ---
-  - curl -fsSL https://get.docker.com | sh
+  # --- install Docker from its official apt repo (signed, not curl | sh) ---
+  - |
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    . /etc/os-release
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $${VERSION_CODENAME} stable" \
+      > /etc/apt/sources.list.d/docker.list
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - systemctl enable --now docker
 
   # --- block containers from reading cloud-init secrets via Hetzner's metadata service ---

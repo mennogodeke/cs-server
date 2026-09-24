@@ -1,17 +1,19 @@
 # cs-server — on-demand private Counter-Strike 2 server
 
-<!-- TODO(review): for the public/portfolio version, open with a short "what & why"
-     (create/destroy per session, reaper safety net, Tailscale-only admin plane,
-     secrets in 1Password, pinned mod stack) before the file map. -->
+One CS2 instance on Hetzner Cloud that you **create before a session and destroy
+after**, so you only ever pay for the hours you actually play. An hourly GitHub
+Actions **reaper** force-deletes anything left running by accident. Admin access
+(SSH, RCON) exists only over a **Tailscale**-only admin plane — there's no public
+SSH port at all — and every credential lives in **1Password**, pulled at boot,
+never committed. The mod stack (Metamod, CounterStrikeSharp, MatchZy/Prop Hunt)
+is version-**pinned** in [`addons/versions.lock`](addons/versions.lock) rather
+than tracking `latest`.
 
-One CS2 instance on Hetzner Cloud that you **create before a session and destroy after**.
-<!-- TODO(review): code accepts 1v1–8v8, not 3v3 → 8v8. -->
-Configurable 3v3 → 8v8. The game install and demos live on a persistent volume; a
+Configurable 1v1–8v8. The game install and demos live on a persistent volume; a
 reserved IP keeps the `connect` string stable. Full rationale:
 [`docs/playbook.html`](docs/playbook.html).
 
-<!-- TODO(review): drop this pointer if STATUS.md is deleted. -->
-> **Resuming this work?** Start at [`docs/STATUS.md`](docs/STATUS.md), then
+> For the full phased build plan (setup, verify steps, known issues), see
 > [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
 ```
@@ -23,24 +25,22 @@ scripts/pre.sh         installs Metamod/CounterStrikeSharp/MatchZy per addons/ve
 addons/versions.lock   pinned mod versions (not necessarily "latest" — see the file's own notes)
 bin/gameday            the CLI: bootstrap | up | down | status | connect | rcon
 bin/gameday-rcon-client.py  standalone RCON prompt (works around an in-game client quirk)
+secrets.op.env.example the op:// refs template for 1Password-backed secrets
 test/                  bats tests for the gameday logic
 .github/workflows/     lint (terraform fmt/validate, shellcheck, bats) + the reaper
-docs/                  RUNBOOK, STATUS, and the playbook design doc
+docs/                  RUNBOOK and the playbook design doc
 ```
 
 ## Prerequisites
 
-<!-- TODO(review): reads like personal notes ("Arch/Omarchy", "already present").
-     Make it distro-neutral: tool + minimum version + link. -->
-
-| Tool | Install (Arch/Omarchy) | Notes |
-|------|------------------------|-------|
-| terraform | `pacman -S terraform` | already present (1.15.9) |
-| hcloud | `pacman -S hcloud` | already present |
-| docker | `pacman -S docker` | only needed for local compose testing |
-| bats | `pacman -S bats` | to run `test/` |
-| op (1Password CLI) | `pacman -S 1password-cli` | **recommended default** — see below |
-| tailscale | `pacman -S tailscale` | for admin SSH/RCON — there's no public SSH port |
+| Tool | Minimum version | Notes |
+|------|------------------|-------|
+| [Terraform](https://developer.hashicorp.com/terraform/install) | 1.9+ | |
+| [hcloud CLI](https://github.com/hetznercloud/cli#installation) | any recent | Hetzner Cloud CLI |
+| [Docker](https://docs.docker.com/engine/install/) | any recent | only needed for local compose testing |
+| [bats](https://bats-core.readthedocs.io/en/stable/installation.html) | any recent | to run `test/` |
+| [op (1Password CLI)](https://developer.1password.com/docs/cli/get-started/) | any recent | **recommended default** — see below |
+| [Tailscale](https://tailscale.com/download) | any recent | for admin SSH/RCON — there's no public SSH port |
 
 You also need:
 
@@ -52,9 +52,10 @@ You also need:
 
 ## One-time setup
 
-Secrets live in 1Password (vault `cs-server`, one item per secret — see below) by
-default. `secrets.auto.tfvars.example` in each `terraform/` dir documents the
-git-ignored-tfvars fallback if you'd rather not use `op`.
+Secrets live in 1Password by default — copy `secrets.op.env.example` to
+`secrets.op.env` and point it at your own vault (see below). `secrets.auto.tfvars.example`
+in each `terraform/` dir documents the git-ignored-tfvars fallback if you'd
+rather not use `op`.
 
 ```sh
 CS2_SECRET_SOURCE=op ./bin/gameday bootstrap          # review the plan, approve
@@ -93,18 +94,26 @@ shell profile to stop typing it every time.
 
 ### Secrets in 1Password
 
-<!-- TODO(review): replace this personal vault/item table with the op:// refs
-     approach (see load_secrets in bin/gameday) and a secrets.op.env.example. -->
+`load_secrets` in `bin/gameday` reads `secrets.op.env` (git-ignored) — a plain
+list of `TF_VAR_<name>=op://<vault>/<item>/<field>` references, one per line.
+Copy the template and point each ref at your own vault/item layout:
 
-Vault `cs-server`, one item per secret (`--vault` is `$CS2_OP_VAULT`, default `cs-server`):
+```sh
+cp secrets.op.env.example secrets.op.env
+$EDITOR secrets.op.env
+```
 
-| Item | Type | Field |
-|------|------|-------|
-| `Gameday: Hetzner API Key` | Login | `password` |
-| `Steam GSLT` | Login | `password` |
-| `Gameday: CS2 Server Password` | Login | `password` |
-| `Gameday: CS2 RCON Password` | Login | `password` |
-| `tailgate cs-server ssh` | Secure Note | `notesPlain` — reusable + ephemeral Tailscale auth key |
+```sh
+TF_VAR_hcloud_token=op://<vault>/<item>/password
+TF_VAR_gslt=op://<vault>/<item>/password
+TF_VAR_sv_password=op://<vault>/<item>/password
+TF_VAR_rcon_password=op://<vault>/<item>/password
+TF_VAR_tailscale_authkey=op://<vault>/<item>/notesPlain
+```
+
+An `op://` reference can't contain a colon, even percent-encoded — if an
+item's title has one, reference it by item ID instead
+(`op item get "<title>" --vault <vault> --format json | jq -r .id`).
 
 ### Admin access (SSH / RCON)
 
@@ -128,10 +137,9 @@ timing quirk over a tunneled connection.
 server older than `CS2_MAX_SESSION_HOURS` (default 6). It's the safety net for a
 forgotten `gameday down`. Set it up once:
 
-<!-- TODO(review): drop `--repo mennogodeke/cs-server` — gh defaults to the current repo. -->
 ```sh
-gh secret set HCLOUD_TOKEN --repo mennogodeke/cs-server
-gh variable set CS2_MAX_SESSION_HOURS --body 12 --repo mennogodeke/cs-server
+gh secret set HCLOUD_TOKEN
+gh variable set CS2_MAX_SESSION_HOURS --body 12
 ```
 
 Because `session/` only *reads* the IP/firewall/volume (they're data sources), a

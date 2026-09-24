@@ -184,11 +184,7 @@
 
 <div class="wrap">
   <section class="hero">
-    <!-- TODO(review): this is the original pre-build plan and has drifted (golden
-         snapshot vs the volume actually used, SSH open to your IP vs Tailscale-only,
-         ~€5/mo vs ~€11.70 in README). Label it "original design, Sept 2026" and add a
-         short "what changed in the build" note, rather than rewriting it. -->
-    <p class="eyebrow">Infra plan &middot; Counter-Strike 2 &middot; Sept 2026</p>
+    <p class="eyebrow">Original design &middot; Counter-Strike 2 &middot; Sept 2026</p>
     <h1>A private CS2 server that only exists while you play</h1>
     <p class="lede">One instance, spun up with a single command before a session and destroyed after &mdash; configurable from 3v3 to 8v8. The game files wait in a cheap snapshot; a reserved IP keeps the <code>connect</code> string constant. Around <strong>&euro;5 a month</strong> for typical use.</p>
     <div class="assumptions">
@@ -197,6 +193,11 @@
       <span>lifecycle: <b>on-demand (create/destroy)</b></span>
       <span>mgmt: <b>Terraform + Compose</b></span>
       <span>host: <b>Hetzner</b></span>
+    </div>
+
+    <div class="note info">
+      <span class="tag">what changed in the build</span>
+      <p>This is the original pre-build plan and has drifted from what actually shipped &mdash; see <a href="../README.md">README.md</a> for the current state. Three deltas worth knowing: the "golden snapshot" below became a persistent <strong>data volume</strong> instead, which also grew from an assumed 80&nbsp;GB to <strong>180&nbsp;GB</strong>; "SSH open to your IP" became <strong>Tailscale-only</strong>, no public SSH port at all; and actual typical cost landed around <strong>&euro;11.70/mo</strong> for the CCX13, mostly from that larger volume plus real (not assumed) usage.</p>
     </div>
   </section>
 

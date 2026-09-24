@@ -35,11 +35,10 @@ path to "friends can play"; phase 7 is the critical path to "MatchZy 5v5".
   done
   ```
   Pick the lowest median. `fsn1` and `nbg1` are usually within a few ms for NL/DE border.
-<!-- TODO(review): admin_cidr no longer exists (SSH moved to Tailscale in phase 5).
-     Replace with "join this machine to your tailnet + create a tagged auth key". -->
-- [ ] **Admin IP**: `curl -s https://ipv4.icanhazip.com` → use as `admin_cidr = "<ip>/32"`.
-      If your home IP is dynamic, expect to re-run bootstrap when it changes, or plan for
-      Tailscale in phase 5.
+- [ ] **Tailscale**: this machine needs to already be on the tailnet the session
+      server will join (`tailscale up` here if it isn't yet). Admin SSH/RCON only
+      ever reach the session server over Tailscale (see Phase 5) — there's no
+      public admin port or IP allowlist to configure.
 - [ ] Run the tests once: `bats test` → all green.
 
 **Verify:** `hcloud context create cs2` (paste token) then `hcloud server list` returns an empty list without error.
@@ -53,7 +52,7 @@ path to "friends can play"; phase 7 is the critical path to "MatchZy 5v5".
 ```sh
 cd terraform/bootstrap
 cp secrets.auto.tfvars.example secrets.auto.tfvars
-$EDITOR secrets.auto.tfvars        # hcloud_token + admin_cidr  <!-- TODO(review): admin_cidr is gone -->
+$EDITOR secrets.auto.tfvars        # hcloud_token
 $EDITOR variables.tf               # only if you chose nbg1: change location default
 cd -
 ./bin/gameday bootstrap            # review plan — 4 resources — then approve
@@ -63,13 +62,13 @@ cd -
 ```sh
 hcloud primary-ip list             # cs2-ipv4, not assigned
 hcloud firewall list               # cs2-fw
-hcloud volume list                 # cs2-data, 80 GB, not attached  <!-- TODO(review): 180 GB now, here + phase 2 + cost checkpoint -->
+hcloud volume list                 # cs2-data, 180 GB, not attached
 terraform -chdir=terraform/bootstrap output primary_ipv4
 ```
 - [ ] Record the IP. Optionally add a DNS `A` record (`cs.yourdomain.nl → <ip>`) so the connect string is memorable.
 - [ ] Commit the changes: `git add -A && git commit` (secrets are git-ignored — double-check `git status` shows no `*.auto.tfvars`).
 
-**Cost checkpoint:** from here you pay ~**€4/mo** (IP + volume) even with no server running. That's the floor.
+**Cost checkpoint:** from here you pay ~**€8.50/mo** (IP + volume) even with no server running. That's the floor.
 
 **If it breaks:**
 - `assignee_type`/`datacenter` errors → provider version skew; this repo targets hcloud `~> 1.49` and was validated on 1.68.
@@ -84,12 +83,12 @@ terraform -chdir=terraform/bootstrap output primary_ipv4
 ```sh
 cd terraform/session
 cat > secrets.auto.tfvars <<'EOF'
-hcloud_token  = "…"
-gslt          = "…"
-sv_password   = "friday"
-rcon_password = "…32+ random chars…"
+hcloud_token      = "…"
+gslt              = "…"
+sv_password       = "friday"
+rcon_password     = "…32+ random chars…"
+tailscale_authkey = "tskey-auth-…"        # reusable + ephemeral, see Phase 6
 EOF
-# TODO(review): missing tailscale_authkey — this example no longer applies as-is.
 cd -
 ./bin/gameday up --format 5v5 --map de_dust2
 ```
@@ -104,7 +103,7 @@ ssh root@<ip> 'cd /opt/cs2 && docker compose logs -f cs2'
 First boot downloads CS2 (~60 GB, 20–40 min). Subsequent boots reuse the volume.
 
 **Verify:**
-- [ ] `df -h /opt/cs2/data` on the server shows the **80 GB volume** mounted (not the root disk).
+- [ ] `df -h /opt/cs2/data` on the server shows the **180 GB volume** mounted (not the root disk).
 - [ ] `docker compose logs cs2` ends with the server registering with Steam (GSLT accepted, no `PreMinidumpCallback` crash loop).
 - [ ] From your client console: `connect <ip>:27015; password friday` → you spawn on de_dust2.
 - [ ] Server console `status` shows your SteamID and a sane `ping`.
@@ -143,10 +142,9 @@ Iterate until `up → playable` is reliable and unattended, then move on.
 **Goal:** a forgotten `down` can't bill for days.
 
 ```sh
-# TODO(review): drop `--repo mennogodeke/cs-server` below — gh defaults to the current repo.
 git push -u origin main                                          # if not already pushed
-gh secret set HCLOUD_TOKEN --repo mennogodeke/cs-server           # paste the token
-gh variable set CS2_MAX_SESSION_HOURS --body 6 --repo mennogodeke/cs-server
+gh secret set HCLOUD_TOKEN                                       # paste the token
+gh variable set CS2_MAX_SESSION_HOURS --body 6
 ```
 
 **Verify:**
@@ -183,20 +181,18 @@ the online one directly.
 
 **Goal:** no plaintext secrets on disk.
 
-<!-- TODO(review): the item names below are your personal vault layout — generalise
-     once the op:// refs approach lands. -->
-
-- [x] One item per secret in the **`cs-server`** vault (not a single multi-field item
-      — matches how the vault had already organically grown): `Gameday: Hetzner API
-      Key`, `Steam GSLT`, `Gameday: CS2 Server Password`, `Gameday: CS2 RCON
-      Password` (all Login items, `password` field), `tailgate cs-server ssh`
-      (Secure Note, `notesPlain` — the Tailscale authkey).
+- [x] One item per secret (not a single multi-field item — matches how a vault
+      tends to organically grow), referenced from `secrets.op.env` (git-ignored,
+      copy `secrets.op.env.example`) as `op://<vault>/<item>/<field>` — see
+      README's "Secrets in 1Password". An item title with a colon (e.g.
+      `Gameday: X`) can't be used directly in an `op://` ref; reference it by
+      item ID instead.
 - [x] `CS2_SECRET_SOURCE=op ./bin/gameday up --format 5v5` works — tested end to end
       for both `bootstrap` and `up`.
 - [x] Deleted `terraform/*/secrets.auto.tfvars` (kept `.example`, added the one that
       was missing for `session/`).
 - [ ] CI: the reaper only needs `HCLOUD_TOKEN` (already a `gh secret`). If you later add a CI `gameday` job, use a **1Password service account** token as a single `gh secret` and `op` in the workflow.
-- [x] `README.md` documents `op` as the default, with the real vault/item table.
+- [x] `README.md` documents `op` as the default, with the `secrets.op.env` setup.
 
 ---
 
@@ -276,8 +272,7 @@ the online one directly.
       on the same volume.
 - [x] In-game: connected, became a prop automatically (hiders don't see their
       own transform in first-person — normal), `.swap` cycles between the 6
-      real prop models. Confirmed by the user live.
-      <!-- TODO(review): "confirmed by the user" reads like AI session notes — reword. -->
+      real prop models. Confirmed live, in-game.
 
 **Reality check:** budget ~1 h of maintenance after each **major** CS2 update — Metamod/CSSharp routinely need a rebuild. `--mode vanilla` is your safety valve. (This played out for real the same night — see the versions.lock note above.)
 

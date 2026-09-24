@@ -30,10 +30,7 @@ cs2_tailscale_ip() {
   local ip
   while IFS= read -r ip; do
     [[ -n "$ip" ]] || continue
-    # TODO(review): `timeout` is GNU coreutils — not on stock macOS, so every probe
-    # fails and `gameday rcon` always dies below. Use `nc -z -w 3` or a portable
-    # background-and-kill fallback.
-    if timeout 3 bash -c "cat < /dev/null > /dev/tcp/${ip}/22" 2>/dev/null; then
+    if nc -z -w 3 "$ip" 22 2>/dev/null; then
       echo "$ip"
       return 0
     fi

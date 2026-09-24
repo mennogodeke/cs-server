@@ -6,16 +6,14 @@
 #   gameday down [-y]
 #   gameday status
 #   gameday connect
-#   gameday rcon      open an SSH tunnel for RCON (not public — see terraform/bootstrap firewall)
+#   gameday rcon [--show-password]   open an SSH tunnel for RCON (not public — see
+#                                     terraform/bootstrap firewall); password hidden unless asked
 #
 # Secrets: by default Terraform reads a git-ignored *.auto.tfvars. To pull them
 # from 1Password instead:  CS2_SECRET_SOURCE=op gameday up   (or --secrets op)
-#   vault: $CS2_OP_VAULT (default "cs-server"), one item per secret:
-#     Gameday: Hetzner API Key   (login, password)
-#     Steam GSLT                 (login, password)
-#     Gameday: CS2 Server Password  (login, password)
-#     Gameday: CS2 RCON Password    (login, password)
-#     tailgate cs-server ssh      (secure note, notesPlain) — Tailscale auth key
+#   Reads secrets.op.env (git-ignored) — copy secrets.op.env.example and point
+#   each TF_VAR_* at your own vault/item as an op:// reference. Override the
+#   path with CS2_OP_ENV_FILE.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,26 +24,23 @@ source "$HERE/_lib.sh"
 BOOTSTRAP_DIR="$ROOT/terraform/bootstrap"
 SESSION_DIR="$ROOT/terraform/session"
 
-# TODO(review): the header is 18 lines but this prints 2-13, so `gameday help`
-# cuts the 1Password item list off after "one item per secret:".
-usage() { sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
-# TODO(review): replace the hard-coded vault/item names below (and in the header,
-# README, RUNBOOK) with `op run --env-file=<git-ignored file of op:// refs>`,
-# plus a committed secrets.op.env.example. Keeps personal vault/item names out
-# of the public repo and works with anyone's vault layout.
 load_secrets() {
   case "${CS2_SECRET_SOURCE:-tfvars}" in
     op)
       cs2_need op
-      local vault="${CS2_OP_VAULT:-cs-server}"
-      TF_VAR_hcloud_token="$(op item get 'Gameday: Hetzner API Key' --vault "$vault" --fields password --reveal)"
-      TF_VAR_gslt="$(op item get 'Steam GSLT' --vault "$vault" --fields password --reveal)"
-      TF_VAR_sv_password="$(op item get 'Gameday: CS2 Server Password' --vault "$vault" --fields password --reveal)"
-      TF_VAR_rcon_password="$(op item get 'Gameday: CS2 RCON Password' --vault "$vault" --fields password --reveal)"
-      TF_VAR_tailscale_authkey="$(op item get 'tailgate cs-server ssh' --vault "$vault" --fields notesPlain --reveal)"
-      export TF_VAR_hcloud_token TF_VAR_gslt TF_VAR_sv_password TF_VAR_rcon_password TF_VAR_tailscale_authkey
-      cs2_log "secrets loaded from 1Password (vault: $vault)"
+      local envfile="${CS2_OP_ENV_FILE:-$ROOT/secrets.op.env}"
+      [[ -f "$envfile" ]] || cs2_die "CS2_SECRET_SOURCE=op needs $envfile — copy secrets.op.env.example and point it at your own vault"
+      local line key ref val
+      while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        key="${line%%=*}"
+        ref="${line#*=}"
+        val="$(op read "$ref")" || cs2_die "failed to resolve $key from $ref ($envfile)"
+        export "$key=$val"
+      done < "$envfile"
+      cs2_log "secrets loaded from 1Password via $envfile"
       ;;
     tfvars)
       cs2_log "secrets: git-ignored *.auto.tfvars (set CS2_SECRET_SOURCE=op to use 1Password)"
@@ -94,9 +89,14 @@ cmd_up() {
 cmd_down() {
   cs2_need terraform
   load_secrets
-  # TODO(review): header advertises `down [-y]`, but "$@" goes straight to
-  # terraform, which has no -y flag (only -auto-approve) — `gameday down -y` errors.
-  terraform -chdir="$SESSION_DIR" destroy "$@"
+  local -a tf_extra=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -y|--yes) tf_extra+=(-auto-approve); shift ;;
+      *)        tf_extra+=("$1"); shift ;;
+    esac
+  done
+  terraform -chdir="$SESSION_DIR" destroy "${tf_extra[@]+"${tf_extra[@]}"}"
   cs2_log "session destroyed. Reserved IP, firewall and data volume remain."
 }
 
@@ -116,13 +116,22 @@ cmd_connect() {
 cmd_rcon() {
   cs2_need terraform
   cs2_need ssh
+  local show_password=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --show-password) show_password=1; shift ;;
+      *)                cs2_die "unknown flag for 'rcon': $1" ;;
+    esac
+  done
   local pw ip
   pw="$(terraform -chdir="$SESSION_DIR" output -raw rcon_password 2>/dev/null)" || cs2_die "no running session"
   ip="$(cs2_tailscale_ip cs2-session)"
   cs2_log "tunnelling localhost:27016 -> $ip:27016 over the tailnet (Ctrl-C to close)"
-  # TODO(review): prints the RCON password into terminal scrollback/tmux logs.
-  # Consider only printing it on request (e.g. --show-password).
-  cs2_log "in-game: rcon_address 127.0.0.1:27016 ; rcon_password $pw"
+  if [[ "$show_password" == "1" ]]; then
+    cs2_log "in-game: rcon_address 127.0.0.1:27016 ; rcon_password $pw"
+  else
+    cs2_log "in-game: rcon_address 127.0.0.1:27016 ; rcon_password hidden — rerun with 'gameday rcon --show-password', or: terraform -chdir=$SESSION_DIR output -raw rcon_password"
+  fi
   ssh -o StrictHostKeyChecking=accept-new -L 27016:localhost:27016 "root@$ip"
 }
 

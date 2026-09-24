@@ -1,9 +1,11 @@
 # Pinned CS2 mod versions, read by scripts/pre.sh before each server start.
 # Bump deliberately and test on a throwaway session first: a CS2 patch often
 # breaks Metamod/CSSharp until they ship a rebuild — that's what
-# `gameday up --vanilla` (CS2_MODS=0) is the safety valve for.
-# TODO(review): `--vanilla` was removed — it's `--mode vanilla` now.
-# TODO(review): add a *_SHA256 next to each pin below for pre.sh to verify.
+# `gameday up --mode vanilla` (CS2_MODS=0) is the safety valve for.
+#
+# Each *_SHA256 below is the sha256 of that exact pinned release asset —
+# pre.sh verifies it before extracting. Recompute when bumping a version:
+#   curl -fsSL <asset-url> | sha256sum
 #
 # Re-check latest compatible versions before bumping:
 #   metamod            https://www.sourcemm.net/downloads.php?branch=dev
@@ -25,9 +27,12 @@
 # is community-confirmed working with CSSharp v1.0.374 + MatchZy 0.8.15. Don't
 # bump past 1461 until CSSharp ships a rebuild against the newer interface.
 METAMOD_BUILD=1411
+METAMOD_SHA256=e3d4c3d457a1c86a5079e8bd8248a4a00361c7d0a3dce7c7e0c4c45458096649
 
 COUNTERSTRIKESHARP=v1.0.374           # with-runtime build
+COUNTERSTRIKESHARP_SHA256=22a24aa482e226ad0dcdc72cec03e1927d267eb5a1566094e98809a06dcc6792
 MATCHZY=0.8.15
+MATCHZY_SHA256=425955d7565df84915dd6002d0a7848546d3859d376cb493f2988ed182586b57
 
 # --- Prop Hunt stack (optional, extra weight on top of the above) ---
 # Each of these pins its own compatible Metamod ceiling — cross-checked against
@@ -40,5 +45,8 @@ MATCHZY=0.8.15
 #   prophunt has had exactly one release ever (0.0.1, 2026-01-03) — least mature
 #     link in this chain, expect to actually debug this one.
 MULTIADDONMANAGER=v1.5.4              # steamrt3 build — Debian 12 base, not steamrt4 (newer-Linux-only)
+MULTIADDONMANAGER_SHA256=d4bf33889b0fc04d051eb0c38423cb1df058c17842bce1675b6b995df09ec6ee
 CS2MENUMANAGER=v1.0.43
+CS2MENUMANAGER_SHA256=4298588c37955704a206fe185cfddf1d422075e33be3aca7627cce92391ad013
 PROPHUNT=0.0.1
+PROPHUNT_SHA256=d13c107832f2055c5c22977f5b309d76cb6aba5c75650d7913cebc00363522d8

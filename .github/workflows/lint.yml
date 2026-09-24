@@ -32,8 +32,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: install shellcheck + bats
         run: sudo apt-get update && sudo apt-get install -y shellcheck bats
-      # TODO(review): add scripts/pre.sh — the most fragile shell in the repo isn't linted.
       - name: shellcheck
-        run: shellcheck bin/gameday bin/_lib.sh
+        run: shellcheck bin/gameday bin/_lib.sh scripts/pre.sh
       - name: bats
         run: bats test
