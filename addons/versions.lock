@@ -1,0 +1,44 @@
+# Pinned CS2 mod versions, read by scripts/pre.sh before each server start.
+# Bump deliberately and test on a throwaway session first: a CS2 patch often
+# breaks Metamod/CSSharp until they ship a rebuild — that's what
+# `gameday up --vanilla` (CS2_MODS=0) is the safety valve for.
+# TODO(review): `--vanilla` was removed — it's `--mode vanilla` now.
+# TODO(review): add a *_SHA256 next to each pin below for pre.sh to verify.
+#
+# Re-check latest compatible versions before bumping:
+#   metamod            https://www.sourcemm.net/downloads.php?branch=dev
+#   cssharp             https://github.com/roflmuffin/CounterStrikeSharp/releases
+#   matchzy             https://github.com/shobhit-pathak/MatchZy/releases
+#   multiaddonmanager  https://github.com/Source2ZE/MultiAddonManager/releases
+#   cs2menumanager      https://github.com/schwarper/CS2MenuManager/releases
+#   prophunt            https://github.com/exkludera-cssharp/PropHunt/releases
+#
+# Pinned 2026-09-16.
+
+# Metamod dev builds are tagged "2.0.0.<N>" but the asset is named "...-git<N>-...";
+# pre.sh assumes the 2.0.0 prefix stays stable and only this build number changes.
+#
+# PINNED BELOW THE ACTUAL LATEST ON PURPOSE: Metamod 1461+ bumped its SourceHook
+# interface to 18, which CounterStrikeSharp v1.0.374 doesn't support yet
+# ("Plugin uses old SourceHook Metamod build ... (17 < 18)", 0 plugins loaded —
+# see https://github.com/roflmuffin/CounterStrikeSharp/issues/1415). Build 1411
+# is community-confirmed working with CSSharp v1.0.374 + MatchZy 0.8.15. Don't
+# bump past 1461 until CSSharp ships a rebuild against the newer interface.
+METAMOD_BUILD=1411
+
+COUNTERSTRIKESHARP=v1.0.374           # with-runtime build
+MATCHZY=0.8.15
+
+# --- Prop Hunt stack (optional, extra weight on top of the above) ---
+# Each of these pins its own compatible Metamod ceiling — cross-checked against
+# METAMOD_BUILD=1411 above before pinning:
+#   multiaddonmanager v1.6 requires Metamod 1459+ (incompatible with us) — v1.5.4
+#     explicitly says "Metamod 2.0-1411 or earlier is required!", exact match.
+#   cs2menumanager needs a CSSharp with a .NET 10 runtime — confirmed v1.0.374's
+#     with-runtime build actually bundles .NET 10.0.3 (its own README still says
+#     ".NET 8", that text is just stale).
+#   prophunt has had exactly one release ever (0.0.1, 2026-01-03) — least mature
+#     link in this chain, expect to actually debug this one.
+MULTIADDONMANAGER=v1.5.4              # steamrt3 build — Debian 12 base, not steamrt4 (newer-Linux-only)
+CS2MENUMANAGER=v1.0.43
+PROPHUNT=0.0.1

@@ -1,0 +1,6 @@
+models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl
+models/props/de_dust/hr_dust/dust_pottery/dust_pottery_01.vmdl
+models/props/de_dust/hr_dust/dust_pottery/dust_pottery_02.vmdl
+models/props/de_dust/hr_dust/dust_rusty_barrel_hr/dust_rusty_barrel_hr.vmdl
+models/props/de_dust/hr_dust/dust_cart/dust_cart.vmdl
+models/props/de_dust/hr_dust/dust_wood_pallet/dust_wood_pallet_01.vmdl

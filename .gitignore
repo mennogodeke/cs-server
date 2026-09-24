@@ -1,0 +1,32 @@
+# --- Terraform ---
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# --- Secrets (kept out of git until SOPS / 1Password wiring lands) ---
+*.auto.tfvars
+!*.auto.tfvars.example
+secrets.tfvars
+*.env
+!*.env.example
+!env.example
+cfg/matchzy/*admins.json
+!cfg/matchzy/*admins.example.json
+
+# --- Local tooling ---
+.direnv/
+.DS_Store
+*.swp
+
+# --- Python (bin/gameday-rcon-client.py) ---
+__pycache__/
+*.pyc

@@ -1,0 +1,4 @@
+models/props/de_inferno/hr_i/inferno_curtain_closed/inferno_curtain_closed.vmdl
+models/props/de_inferno/hr_i/inferno_light_switch/inferno_light_switch.vmdl
+models/props/de_inferno/hr_i/inferno_stair_railing/inferno_stair_railing.vmdl
+models/props/de_inferno/hr_i/rug_set/rug_set_a.vmdl

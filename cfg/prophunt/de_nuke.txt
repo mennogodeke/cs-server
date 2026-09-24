@@ -1,0 +1,6 @@
+models/props/de_nuke/hr_nuke/nuke_chair/nuke_chair.vmdl
+models/props/de_nuke/hr_nuke/nuke_office_chair/nuke_office_chair.vmdl
+models/props/de_nuke/hr_nuke/nuke_fire_extinguisher/nuke_fire_extinguisher.vmdl
+models/props/de_nuke/hr_nuke/nuke_recycling_bins/nuke_recycling_bin_01.vmdl
+models/props/de_nuke/hr_nuke/nuke_locker_bench/nuke_locker_bench.vmdl
+models/props/de_nuke/hr_nuke/metal_crate_001/metal_crate_001_96.vmdl

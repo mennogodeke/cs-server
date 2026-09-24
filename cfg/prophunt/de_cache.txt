@@ -1,0 +1,3 @@
+models/props/containers/barrels/barrel0003.vmdl
+models/props/containers/barrels/barrel0004.vmdl
+models/props/containers/barrels/barrel0005.vmdl

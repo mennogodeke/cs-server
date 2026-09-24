@@ -1,0 +1,54 @@
+name: cs2 reaper
+
+# Safety net for the on-demand model: destroy any session server that outlived
+# its game night, so a forgotten `gameday down` can't bill for days.
+#
+# Requires:
+#   secret HCLOUD_TOKEN            - Hetzner Cloud project token
+#   variable CS2_MAX_SESSION_HOURS - optional, defaults to 6
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Delete the session server now, regardless of age"
+        type: boolean
+        default: false
+
+concurrency: cs2-reaper
+
+jobs:
+  reap:
+    runs-on: ubuntu-latest
+    env:
+      HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+      MAX_HOURS: ${{ vars.CS2_MAX_SESSION_HOURS || '6' }}
+      FORCE: ${{ inputs.force }}
+    steps:
+      # TODO(review): `latest` with no checksum, in a job holding HCLOUD_TOKEN. Pin a
+      # release version and verify it against the release's checksums file.
+      - name: install hcloud cli
+        run: |
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin hcloud
+      - name: reap stale session servers
+        run: |
+          set -euo pipefail
+          now=$(date -u +%s)
+          # TODO(review): `project=cs2` is hard-coded, but Terraform labels servers
+          # with var.name_prefix — a different prefix makes the reaper miss them.
+          servers=$(hcloud server list -l project=cs2,role=session -o json)
+          echo "$servers" | jq -c '.[]' | while read -r s; do
+            id=$(jq -r '.id' <<<"$s")
+            name=$(jq -r '.name' <<<"$s")
+            created=$(date -u -d "$(jq -r '.created' <<<"$s")" +%s)
+            age_h=$(( (now - created) / 3600 ))
+            if [ "$FORCE" = "true" ] || [ "$age_h" -ge "$MAX_HOURS" ]; then
+              echo "::warning::deleting $name (age ${age_h}h >= ${MAX_HOURS}h)"
+              hcloud server delete "$id"
+            else
+              echo "keeping $name (age ${age_h}h < ${MAX_HOURS}h)"
+            fi
+          done

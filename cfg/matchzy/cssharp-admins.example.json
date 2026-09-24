@@ -1,0 +1,22 @@
+{
+  "Admin1": {
+    "identity": "76561198000000001",
+    "flags": ["@css/root"]
+  },
+  "Admin2": {
+    "identity": "76561198000000002",
+    "flags": ["@css/root"]
+  },
+  "Admin3": {
+    "identity": "76561198000000003",
+    "flags": ["@css/root"]
+  },
+  "Admin4": {
+    "identity": "76561198000000004",
+    "flags": ["@css/root"]
+  },
+  "Admin5": {
+    "identity": "76561198000000005",
+    "flags": ["@css/root"]
+  }
+}

@@ -1,0 +1,52 @@
+# Deployed to /opt/cs2/docker-compose.yml by cloud-init. `.env` is written alongside it
+# with the per-session values (token, passwords, maxplayers, map, mode).
+services:
+  cs2:
+    # TODO(review): `:latest` + pull_policy always = an unreviewed image every boot.
+    # Pin a digest (joedwards32/cs2@sha256:...) and bump it deliberately.
+    image: joedwards32/cs2:latest
+    container_name: cs2
+    pull_policy: always
+    env_file:
+      - .env
+    environment:
+      CS2_PORT: "27015"
+      CS2_LAN: "0"
+      CS2_RCON_PORT: "27016"
+      CS2_BOT_QUOTA: "0"
+      TV_ENABLE: "1"
+      TV_PORT: "27020"
+      TV_AUTORECORD: "1"
+      CS2_LOG: "on"
+      CS2_LOG_MONEY: "0"
+      CS2_LOG_DETAIL: "1"
+    ports:
+      - "27015:27015/tcp"
+      - "27015:27015/udp"
+      - "27020:27020/udp"
+      # RCON proxy (simpleproxy, per the joedwards32/cs2 entrypoint) — loopback-only on
+      # the host as defense in depth; the firewall already blocks it from the internet.
+      - "127.0.0.1:27016:27016/tcp"
+    volumes:
+      - ./data:/home/steam/cs2-dedicated
+      - ./cfg/server.cfg:/home/steam/cs2-dedicated/game/csgo/cfg/server.cfg:ro
+      - ./cfg/mode.cfg:/home/steam/cs2-dedicated/game/csgo/cfg/mode.cfg:ro
+      - ./data/demos:/home/steam/cs2-dedicated/game/csgo/demos
+      - ./scripts/pre.sh:/home/steam/cs2-dedicated/pre.sh:ro
+      - ./addons/versions.lock:/home/steam/cs2-dedicated/versions.lock:ro
+      # Mounted flat (not at their final nested destination) on purpose: Docker
+      # would auto-create a missing bind-mount parent dir as root:root, but the
+      # container runs as uid 1000 — pre.sh copies these into place itself so
+      # the directories it creates are owned correctly. See pre.sh.
+      - ./cfg/matchzy/admins.json:/home/steam/cs2-dedicated/matchzy-admins.json:ro
+      - ./cfg/matchzy/cssharp-admins.json:/home/steam/cs2-dedicated/cssharp-admins.json:ro
+      - ./cfg/prophunt/de_dust2.txt:/home/steam/cs2-dedicated/prophunt-de_dust2.txt:ro
+      - ./cfg/prophunt/de_nuke.txt:/home/steam/cs2-dedicated/prophunt-de_nuke.txt:ro
+      - ./cfg/prophunt/de_inferno.txt:/home/steam/cs2-dedicated/prophunt-de_inferno.txt:ro
+      - ./cfg/prophunt/de_cache.txt:/home/steam/cs2-dedicated/prophunt-de_cache.txt:ro
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    restart: unless-stopped
+    stop_grace_period: 90s

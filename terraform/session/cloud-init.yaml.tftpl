@@ -1,0 +1,122 @@
+#cloud-config
+# Rendered by Terraform (templatefile). Do not edit on the server — edit the template.
+package_update: true
+package_upgrade: false
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - rsync
+  - jq
+
+write_files:
+  - path: /opt/cs2/docker-compose.yml
+    permissions: "0644"
+    content: |
+      ${indent(6, compose_yml)}
+
+  - path: /opt/cs2/cfg/server.cfg
+    permissions: "0644"
+    content: |
+      ${indent(6, server_cfg)}
+
+  - path: /opt/cs2/cfg/mode.cfg
+    permissions: "0644"
+    content: |
+      ${indent(6, mode_cfg)}
+
+  - path: /opt/cs2/scripts/pre.sh
+    permissions: "0755"
+    content: |
+      ${indent(6, pre_sh)}
+
+  - path: /opt/cs2/addons/versions.lock
+    permissions: "0644"
+    content: |
+      ${indent(6, versions_lock)}
+
+  - path: /opt/cs2/cfg/matchzy/admins.json
+    permissions: "0644"
+    content: |
+      ${indent(6, matchzy_admins)}
+
+  - path: /opt/cs2/cfg/matchzy/cssharp-admins.json
+    permissions: "0644"
+    content: |
+      ${indent(6, cssharp_admins)}
+
+  - path: /opt/cs2/cfg/prophunt/de_dust2.txt
+    permissions: "0644"
+    content: |
+      ${indent(6, prophunt_de_dust2)}
+
+  - path: /opt/cs2/cfg/prophunt/de_nuke.txt
+    permissions: "0644"
+    content: |
+      ${indent(6, prophunt_de_nuke)}
+
+  - path: /opt/cs2/cfg/prophunt/de_inferno.txt
+    permissions: "0644"
+    content: |
+      ${indent(6, prophunt_de_inferno)}
+
+  - path: /opt/cs2/cfg/prophunt/de_cache.txt
+    permissions: "0644"
+    content: |
+      ${indent(6, prophunt_de_cache)}
+
+  - path: /opt/cs2/.env
+    permissions: "0600"
+    content: |
+      SRCDS_TOKEN=${gslt}
+      CS2_SERVERNAME=${hostname}
+      CS2_PW=${sv_password}
+      CS2_RCONPW=${rcon_password}
+      CS2_MAXPLAYERS=${maxplayers}
+      CS2_STARTMAP=${startmap}
+      CS2_GAMEALIAS=${gamealias}
+      CS2_TV_DELAY=${tv_delay}
+      CS2_MODS=${mods}
+      CS2_GAMEMODE=${gamemode}
+
+runcmd:
+  # --- mount the persistent data volume at /opt/cs2/data ---
+  - |
+    set -eux
+    VOL=""
+    for _ in $(seq 1 60); do
+      VOL=$(ls /dev/disk/by-id/*HC_Volume_* 2>/dev/null | grep -v -- '-part' | head -n1) || true
+      [ -n "$VOL" ] && break
+      sleep 5
+    done
+    [ -n "$VOL" ] || { echo "volume never appeared"; exit 1; }
+    mkdir -p /opt/cs2/data
+    if ! blkid "$VOL" >/dev/null 2>&1; then mkfs.ext4 -F "$VOL"; fi
+    grep -q "/opt/cs2/data" /etc/fstab || echo "$VOL /opt/cs2/data ext4 discard,nofail,defaults 0 0" >> /etc/fstab
+    mountpoint -q /opt/cs2/data || mount /opt/cs2/data
+    resize2fs "$VOL"
+    chown -R 1000:1000 /opt/cs2/data
+
+  # --- join the tailnet: admin SSH/RCON reach this host by name, never a public port ---
+  # TODO(review): the key is reusable, so a leak = anyone can join the tailnet. Create
+  # it with a tag (e.g. tag:cs2) and add a tailnet ACL so that tag can reach nothing.
+  # TODO(review): curl | sh here and for Docker below — consider the apt repos with
+  # pinned signing keys instead.
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - |
+    set +x
+    tailscale up --authkey=${tailscale_authkey} --hostname=cs2-session
+    set -x
+
+  # --- install Docker from the official convenience script ---
+  - curl -fsSL https://get.docker.com | sh
+  - systemctl enable --now docker
+
+  # --- block containers from reading cloud-init secrets via Hetzner's metadata service ---
+  - iptables -I DOCKER-USER -d 169.254.169.254 -j DROP
+
+  # --- start the server (the image self-updates CS2 into the volume) ---
+  - cd /opt/cs2 && docker compose up -d
+
+final_message: "cs2 session host up after $UPTIME s"

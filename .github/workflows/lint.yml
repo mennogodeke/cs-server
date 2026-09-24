@@ -1,0 +1,39 @@
+name: cs2 lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.9"
+      - name: fmt
+        run: terraform fmt -check -recursive
+      - name: validate bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+        working-directory: terraform/bootstrap
+      - name: validate session
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+        working-directory: terraform/session
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install shellcheck + bats
+        run: sudo apt-get update && sudo apt-get install -y shellcheck bats
+      # TODO(review): add scripts/pre.sh — the most fragile shell in the repo isn't linted.
+      - name: shellcheck
+        run: shellcheck bin/gameday bin/_lib.sh
+      - name: bats
+        run: bats test

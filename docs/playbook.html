@@ -1,0 +1,615 @@
+<title>Private CS2 Server Playbook</title>
+<meta name="description" content="A build plan for a self-hosted, on-demand private Counter-Strike 2 server on Hetzner: create before a session, destroy after, ~5 euro a month.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f4f6f8;
+    --surface: #ffffff;
+    --surface-2: #e9edf1;
+    --border: #d5dce3;
+    --border-strong: #bac4ce;
+    --ink: #171d25;
+    --ink-muted: #566270;
+    --ink-faint: #8a96a2;
+    --accent: #96660b;
+    --accent-line: #d7a343;
+    --accent-soft: #f6ecd6;
+    --link: #245d8b;
+    --good: #2f7d34;
+    --warn: #8a5a02;
+    --crit: #b23b36;
+    --code-bg: #eef1f4;
+    --shadow: 0 1px 2px rgba(20,30,40,.06), 0 8px 24px rgba(20,30,40,.05);
+  }
+  :root:not([data-theme="light"]) { color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #0e1318;
+      --surface: #161d25;
+      --surface-2: #1d2630;
+      --border: #29343f;
+      --border-strong: #3a4754;
+      --ink: #c8d3df;
+      --ink-muted: #8b98a6;
+      --ink-faint: #64707d;
+      --accent: #f0b429;
+      --accent-line: #7c5e1f;
+      --accent-soft: #251d0f;
+      --link: #6cb3ed;
+      --good: #62b866;
+      --warn: #e0a53b;
+      --crit: #e26a65;
+      --code-bg: #0f151b;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #0e1318;
+    --surface: #161d25;
+    --surface-2: #1d2630;
+    --border: #29343f;
+    --border-strong: #3a4754;
+    --ink: #c8d3df;
+    --ink-muted: #8b98a6;
+    --ink-faint: #64707d;
+    --accent: #f0b429;
+    --accent-line: #7c5e1f;
+    --accent-soft: #251d0f;
+    --link: #6cb3ed;
+    --good: #62b866;
+    --warn: #e0a53b;
+    --crit: #e26a65;
+    --code-bg: #0f151b;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 44px); }
+  .prose { max-width: 68ch; }
+
+  h1, h2, h3 { font-family: "Chakra Petch", "Segoe UI", system-ui, sans-serif; text-wrap: balance; line-height: 1.18; }
+
+  header.top { border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 20; }
+  .top-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; }
+  .brand { display: flex; align-items: baseline; gap: 12px; font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; font-size: 13px; color: var(--ink-muted); }
+  .brand b { color: var(--accent); font-weight: 500; }
+  .theme-toggle { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; color: var(--ink-muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 6px 10px; cursor: pointer; }
+  .theme-toggle:hover { color: var(--ink); border-color: var(--border-strong); }
+  .theme-toggle:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
+
+  .hero { padding: clamp(40px, 7vw, 78px) 0 clamp(28px, 4vw, 44px); border-bottom: 1px solid var(--border); }
+  .eyebrow { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 0 0 18px; }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3.15rem); font-weight: 700; margin: 0 0 20px; letter-spacing: -.01em; }
+  .hero p.lede { font-size: clamp(1.05rem, 2vw, 1.24rem); color: var(--ink-muted); margin: 0; max-width: 60ch; }
+  .assumptions { margin-top: 34px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .assumptions span { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; color: var(--ink-muted); }
+  .assumptions span b { color: var(--ink); font-weight: 500; }
+
+  section.block { padding: clamp(40px, 6vw, 68px) 0; border-bottom: 1px solid var(--border); }
+  .sec-label { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 10px; }
+  .sec-label::before { content: "> "; color: var(--accent); }
+  section.block h2 { font-size: clamp(1.5rem, 3.2vw, 2.05rem); font-weight: 600; margin: 0 0 20px; }
+  section.block h3 { font-size: 1.13rem; font-weight: 600; margin: 34px 0 12px; color: var(--ink); }
+  p { margin: 0 0 16px; }
+  a { color: var(--link); text-underline-offset: 2px; }
+  strong { font-weight: 600; }
+  ul, ol { margin: 0 0 16px; padding-left: 1.3em; }
+  li { margin: 6px 0; }
+  li::marker { color: var(--ink-faint); }
+
+  .rec { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent-line); border-radius: 8px; padding: 24px 26px; box-shadow: var(--shadow); margin: 8px 0 4px; }
+  .rec h3 { margin: 0 0 8px; font-family: "Chakra Petch", sans-serif; }
+  .rec .kicker { font-family: "JetBrains Mono", monospace; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); }
+  .rec ul { margin-bottom: 0; }
+
+  .note { border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; background: var(--surface); margin: 22px 0; font-size: .95rem; }
+  .note .tag { font-family: "JetBrains Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; display: inline-block; margin-bottom: 6px; }
+  .note.warn { border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); }
+  .note.warn .tag { color: var(--warn); }
+  .note.info .tag { color: var(--link); }
+  .note p:last-child { margin-bottom: 0; }
+
+  .table-wrap { overflow-x: auto; margin: 22px 0; border: 1px solid var(--border); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: .89rem; min-width: 640px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); background: var(--surface-2); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr.pick { background: var(--accent-soft); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .verdict { font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; }
+  .v-yes { color: var(--good); }
+  .v-mid { color: var(--warn); }
+  .v-no { color: var(--crit); }
+
+  pre, code { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+  code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: .86em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; overflow-x: auto; font-size: .84rem; line-height: 1.7; margin: 20px 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .c-com { color: var(--ink-faint); }
+  .c-key { color: var(--accent); }
+  .c-str { color: var(--link); }
+
+  .check { list-style: none; padding: 0; margin: 18px 0; }
+  .check li { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--border); }
+  .check li:last-child { border-bottom: none; }
+  .check li::before { content: "\25AA"; color: var(--accent); font-size: .9em; margin-top: .25em; flex: none; }
+
+  figure { margin: 26px 0 8px; }
+  figure svg { width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  figcaption { font-size: .82rem; color: var(--ink-faint); margin-top: 8px; font-family: "JetBrains Mono", monospace; }
+  .d-box { fill: var(--surface-2); stroke: var(--border-strong); }
+  .d-box-accent { fill: var(--accent-soft); stroke: var(--accent-line); }
+  .d-label { fill: var(--ink); font-family: "JetBrains Mono", monospace; font-size: 12px; }
+  .d-sub { fill: var(--ink-faint); font-family: "JetBrains Mono", monospace; font-size: 10.5px; }
+  .d-line { stroke: var(--border-strong); stroke-width: 1.5; fill: none; }
+  .d-line-dash { stroke: var(--border-strong); stroke-width: 1.5; fill: none; stroke-dasharray: 4 4; }
+  .d-arrow { fill: var(--border-strong); }
+
+  ol.steps { counter-reset: step; list-style: none; padding: 0; margin: 20px 0; }
+  ol.steps > li { counter-increment: step; display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  ol.steps > li:last-child { border-bottom: none; }
+  ol.steps > li::before { content: counter(step); font-family: "JetBrains Mono", monospace; font-size: 13px; font-weight: 500; color: var(--accent); border: 1px solid var(--accent-line); border-radius: 6px; height: 30px; display: grid; place-items: center; }
+
+  footer { padding: 40px 0 64px; color: var(--ink-faint); font-size: .85rem; }
+  footer a { color: var(--ink-muted); }
+  .src-list { columns: 2; column-gap: 32px; font-size: .82rem; margin-top: 10px; }
+  .src-list a { display: block; margin: 4px 0; break-inside: avoid; }
+  @media (max-width: 620px) { .src-list { columns: 1; } table { min-width: 560px; } }
+</style>
+
+<header class="top">
+  <div class="wrap top-inner">
+    <span class="brand">cs&#8209;server&nbsp;/&nbsp;<b>playbook.md</b></span>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle colour theme">theme: auto</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="hero">
+    <!-- TODO(review): this is the original pre-build plan and has drifted (golden
+         snapshot vs the volume actually used, SSH open to your IP vs Tailscale-only,
+         ~€5/mo vs ~€11.70 in README). Label it "original design, Sept 2026" and add a
+         short "what changed in the build" note, rather than rewriting it. -->
+    <p class="eyebrow">Infra plan &middot; Counter-Strike 2 &middot; Sept 2026</p>
+    <h1>A private CS2 server that only exists while you play</h1>
+    <p class="lede">One instance, spun up with a single command before a session and destroyed after &mdash; configurable from 3v3 to 8v8. The game files wait in a cheap snapshot; a reserved IP keeps the <code>connect</code> string constant. Around <strong>&euro;5 a month</strong> for typical use.</p>
+    <div class="assumptions">
+      <span>players: <b>NL / DE border</b></span>
+      <span>format: <b>3v3 &rarr; 8v8 + practice</b></span>
+      <span>lifecycle: <b>on-demand (create/destroy)</b></span>
+      <span>mgmt: <b>Terraform + Compose</b></span>
+      <span>host: <b>Hetzner</b></span>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">01 &middot; The short version</p>
+    <h2>Rent it by the hour, delete it after</h2>
+    <div class="prose">
+      <p>Run <strong>one CS2 instance</strong> on a small Hetzner box that you <strong>create before a session and destroy after</strong>. Hetzner bills cloud servers hourly and keeps charging for a <em>stopped</em> server until the server object is <em>deleted</em> &mdash; so "off" has to mean <strong>gone</strong>, not powered down. Between sessions almost nothing is running: a ~&euro;0.75/mo snapshot holds the installed game, mods and configs, and a ~&euro;0.50/mo reserved IP keeps your friends' connect string stable. A one-command <code>gameday up</code> / <code>gameday down</code> wrapper around Terraform drives the lifecycle.</p>
+    </div>
+
+    <div class="rec">
+      <p class="kicker">One box, hourly, dedicated cores</p>
+      <h3>Hetzner CCX13, created on demand</h3>
+      <ul>
+        <li><strong>CCX13</strong> &mdash; 2 <em>dedicated</em> vCPU, 8&nbsp;GB, Falkenstein or Nuremberg (~15&ndash;25&nbsp;ms from the NL/DE border). ~&euro;0.066/hr, so a 4-hour game night costs about <strong>&euro;0.26</strong>. Dedicated cores keep CS2's sub-tick simulation smooth &mdash; no noisy-neighbour stutter mid-clutch.</li>
+        <li><strong>Base image</strong>: a golden snapshot with the game + pinned mod stack baked in. Boots to playable in 3&ndash;4 minutes.</li>
+        <li><strong>Stable address</strong>: a reserved Primary IP (<code>auto_delete = false</code>) or a Floating IP, ~&euro;0.50/mo, reassigned to each new server.</li>
+        <li><strong>Format per session</strong>: <code>gameday up --format 6v6 --map de_nuke</code> &mdash; a Terraform variable flows through cloud-init into the server config and MatchZy's <code>players_per_team</code>.</li>
+      </ul>
+    </div>
+
+    <div class="note warn">
+      <span class="tag">stop &ne; free</span>
+      <p>A powered-off Hetzner cloud server bills at the <strong>full hourly rate until you delete it</strong> &mdash; the CPU/RAM/NVMe stay reserved for you. The on-demand pattern is <strong>create/destroy</strong>, not start/stop. Pair it with a nightly "reaper" that destroys any server left running (&sect;09).</p>
+    </div>
+
+    <div class="note info">
+      <span class="tag">the lazy alternative</span>
+      <p>If the orchestration isn't worth it to you, an <strong>always-on CX32</strong> (~&euro;6.80/mo, 4 shared vCPU, EU-only) is the zero-effort option &mdash; always ready, fine for casual 3v3&ndash;8v8, a little risky for tight competitive rounds because the vCPU is shared.</p>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">02 &middot; What "private" requires</p>
+    <h2>Still a public, token-authenticated server</h2>
+    <div class="prose">
+      <p>"Private" means <em>password-gated</em>, not network-isolated. Unless everyone is on your LAN, the server runs in internet mode:</p>
+      <ul>
+        <li><strong>One GSLT.</strong> A Game Server Login Token (Steam &rarr; <a href="https://steamcommunity.com/dev/managegameservers">manage game servers</a>, App ID <code>730</code>) is required for <code>sv_lan 0</code> even on a passworded server. With a single instance you need exactly one token &mdash; bake it into the snapshot or inject it from secrets at boot.</li>
+        <li><strong><code>sv_password</code></strong> gates entry: <code>connect &lt;ip&gt;:27015; password &lt;pw&gt;</code>.</li>
+        <li><strong>There is no 128-tick.</strong> CS2 uses a sub-tick model. Don't pay a premium for "128-tick" hosting &mdash; what matters is uninterrupted single-core CPU time.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">03 &middot; Where to host</p>
+    <h2>Hourly billing changes the answer</h2>
+    <div class="prose">
+      <p>Because you pay by the hour, the monthly sticker price stops mattering and you can rent a <strong>dedicated-vCPU</strong> plan you'd never keep full-time. CS2's simulation is effectively single-threaded and the sub-tick system needs every inbound packet handled immediately &mdash; per-core clock and <em>uninterrupted</em> core time win, and shared vCPU risks steal-induced "var" spikes mid-round. A CCX13's two dedicated vCPU cost about &euro;0.066/hr &mdash; pennies per session &mdash; and take that risk off the table.</p>
+      <p>Round-trip from the NL/DE border: <strong>Hetzner Falkenstein / Nuremberg</strong> ~15&ndash;25&nbsp;ms (no NL region); <strong>Netcup / OVH / Vultr Amsterdam</strong> ~5&ndash;15&nbsp;ms. The gap isn't decisive for a friends' server, and Hetzner earns its place on tooling: a first-class Terraform provider, free automatic DDoS mitigation, an edge firewall, and true hourly billing with a monthly cap.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Option</th><th>CPU</th><th>~&euro;/hr</th><th>~&euro;/mo if left on</th><th>On-demand fit</th><th>Verdict</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Hetzner <strong>CX32</strong></td><td>4 vCPU <em>shared</em></td><td class="num">~0.011</td><td class="num">~6.80 (cap)</td><td>Casual only; shared vCPU</td><td class="verdict v-mid">OK</td></tr>
+          <tr><td>Hetzner <strong>CPX31</strong></td><td>4 vCPU <em>shared</em> AMD</td><td class="num">~0.026</td><td class="num">~16</td><td>Works; mild steal risk</td><td class="verdict v-mid">OK</td></tr>
+          <tr class="pick"><td>Hetzner <strong>CCX13</strong></td><td>2 vCPU <em>dedicated</em></td><td class="num">~0.066</td><td class="num">~43 (cap)</td><td>Ideal for one instance</td><td class="verdict v-yes">RECOMMENDED</td></tr>
+          <tr><td>Hetzner <strong>CCX23</strong></td><td>4 vCPU <em>dedicated</em></td><td class="num">~0.13</td><td class="num">~86 (cap)</td><td>Headroom for 8v8 + bots + GOTV</td><td class="verdict v-yes">SOLID</td></tr>
+          <tr><td>Hetzner <strong>AX42</strong> dedicated</td><td>Ryzen 8c/16t</td><td class="num">n/a</td><td class="num">~46 +39</td><td>Monthly commit &mdash; can't be ephemeral</td><td class="verdict v-no">NOT NOW</td></tr>
+          <tr><td>Netcup <strong>RS</strong> Amsterdam</td><td>dedicated EPYC</td><td class="num">monthly</td><td class="num">~9&ndash;13</td><td>Lowest ping, but no hourly billing</td><td class="verdict v-mid">ALT (always-on)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose"><strong>Sizing:</strong> one instance with up to 16 players, a few bots and GOTV fits comfortably in 2 dedicated vCPU / 8&nbsp;GB. 8v8 with heavy utility spam is the stress case &mdash; step up to CCX23 if you want margin. Keep <code>sv_hibernate_when_empty 1</code> so a lobby waiting for players doesn't peg the core (and the hourly meter still runs, so start it close to kick-off).</p>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">04 &middot; The on-demand lifecycle</p>
+    <h2>Create, play, destroy</h2>
+    <div class="prose">
+      <p>The server exists only while you're playing. Everything that must outlive it lives in one of three places: your <strong>Git repo</strong> (configs, Compose file, pinned mods), a <strong>snapshot or volume</strong> (the installed 60&nbsp;GB game), and a couple of <strong>always-allocated cheap resources</strong> (the reserved IP, the firewall, an optional demo store).</p>
+    </div>
+
+    <h3>Keeping the game between sessions</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Approach</th><th>Cost at rest</th><th>Boot time</th><th>Notes</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr class="pick"><td>Golden <strong>snapshot</strong></td><td class="num">~0.60&ndash;0.90/mo</td><td class="num">~2 min + update</td><td>Billed on used space only. Rebuild every few weeks when mods change (Packer, or a <code>gameday build</code> job).</td><td class="verdict v-yes">PICK</td></tr>
+          <tr><td>Persistent <strong>Volume</strong> (~80&nbsp;GB)</td><td class="num">~3.50/mo</td><td class="num">~1 min</td><td>Attach to each new server; demos persist automatically; no rebuild step.</td><td class="verdict v-mid">+&euro;3 for simplicity</td></tr>
+          <tr><td>Fresh install every time</td><td class="num">0</td><td class="num">20&ndash;40 min</td><td>Only if you play rarely and don't mind the wait for a 60&nbsp;GB download.</td><td class="verdict v-no">NO</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>A session, end to end</h3>
+    <ol class="steps">
+      <li><code>gameday up --format 6v6 --map de_nuke</code> &mdash; Terraform creates a CCX13 from the snapshot, reassigns the reserved IP, applies the firewall.</li>
+      <li>cloud-init pulls the repo, decrypts secrets (SOPS), writes the session env, runs <code>docker compose up -d</code>. CS2 self-updates; a health check confirms Metamod + CounterStrikeSharp loaded (else it starts the <code>vanilla</code> profile so the night isn't lost).</li>
+      <li>The script prints &mdash; or posts to Discord &mdash; <code>connect cs.example.net; password &hellip;</code></li>
+      <li>Play. <code>sv_hibernate_when_empty</code> keeps the core idle until people join.</li>
+      <li><code>gameday down</code> &mdash; rsyncs demos to the Storage Box, then <code>terraform destroy</code> removes the server (and volume, if used). IP, snapshot and firewall stay.</li>
+    </ol>
+
+    <figure>
+      <svg viewBox="0 0 920 360" role="img" aria-labelledby="diag-title">
+        <title id="diag-title">Friends connect over UDP through the Hetzner edge firewall to an ephemeral CCX13 that exists only during a session, running one CS2 container plus a GOTV relay via Docker Compose. The gameday wrapper drives Terraform to create and destroy it; a golden snapshot is the base image; demos sync to a Storage Box on shutdown.</title>
+
+        <rect x="16" y="150" width="112" height="60" rx="8" class="d-box"/>
+        <text x="72" y="176" text-anchor="middle" class="d-label">friends</text>
+        <text x="72" y="194" text-anchor="middle" class="d-sub">CS2 client</text>
+        <path class="d-line" d="M128 180 H172"/>
+        <path class="d-arrow" d="M172 180 l-9 -5 v10 z"/>
+
+        <rect x="176" y="138" width="118" height="84" rx="8" class="d-box"/>
+        <text x="235" y="166" text-anchor="middle" class="d-label">Hetzner</text>
+        <text x="235" y="183" text-anchor="middle" class="d-sub">edge firewall</text>
+        <text x="235" y="199" text-anchor="middle" class="d-sub">+ DDoS (free)</text>
+        <text x="322" y="168" text-anchor="middle" class="d-sub">reserved IP</text>
+        <text x="322" y="182" text-anchor="middle" class="d-sub">~&#8364;0.50/mo</text>
+        <path class="d-line" d="M294 196 H352"/>
+        <path class="d-arrow" d="M352 196 l-9 -5 v10 z"/>
+
+        <rect x="356" y="70" width="352" height="212" rx="10" class="d-box-accent"/>
+        <text x="532" y="94" text-anchor="middle" class="d-label">ephemeral server &mdash; CCX13</text>
+        <text x="532" y="110" text-anchor="middle" class="d-sub">exists only during a session</text>
+
+        <rect x="378" y="126" width="150" height="52" rx="7" class="d-box"/>
+        <text x="453" y="148" text-anchor="middle" class="d-label">cs2</text>
+        <text x="453" y="165" text-anchor="middle" class="d-sub">:27015 &middot; UDP</text>
+        <rect x="540" y="126" width="150" height="52" rx="7" class="d-box"/>
+        <text x="615" y="148" text-anchor="middle" class="d-label">GOTV</text>
+        <text x="615" y="165" text-anchor="middle" class="d-sub">:27020 &middot; UDP</text>
+
+        <rect x="378" y="192" width="312" height="40" rx="7" class="d-box"/>
+        <text x="534" y="216" text-anchor="middle" class="d-sub">cloud-init &rarr; docker compose up &middot; mod health-check</text>
+        <text x="532" y="256" text-anchor="middle" class="d-sub">sv_hibernate_when_empty &rarr; ~0 CPU while the lobby waits</text>
+
+        <rect x="392" y="12" width="184" height="36" rx="7" class="d-box"/>
+        <text x="484" y="34" text-anchor="middle" class="d-sub">gameday up/down &rarr; terraform</text>
+        <path class="d-line" d="M484 48 V70"/>
+        <path class="d-arrow" d="M484 70 l-5 -9 h10 z"/>
+
+        <rect x="368" y="300" width="220" height="34" rx="7" class="d-box-accent"/>
+        <text x="478" y="322" text-anchor="middle" class="d-sub">golden snapshot &middot; ~&#8364;0.75/mo</text>
+        <path class="d-line-dash" d="M478 300 V282"/>
+        <path class="d-arrow" d="M478 282 l-5 9 h10 z"/>
+
+        <path class="d-line" d="M708 196 H760"/>
+        <path class="d-arrow" d="M760 196 l-9 -5 v10 z"/>
+        <rect x="764" y="164" width="120" height="64" rx="8" class="d-box"/>
+        <text x="824" y="190" text-anchor="middle" class="d-label">Storage Box</text>
+        <text x="824" y="208" text-anchor="middle" class="d-sub">demos, on down</text>
+      </svg>
+      <figcaption>one ephemeral instance &mdash; repo + snapshot + a stable IP are all that persist</figcaption>
+    </figure>
+
+    <div class="note info">
+      <span class="tag">run it from your phone</span>
+      <p>Wrap <code>gameday up/down</code> in a GitHub Actions <code>workflow_dispatch</code> with <code>format</code> and <code>map</code> inputs. Trigger the game night from the Actions tab or a phone; the workflow posts the connect string to Discord.</p>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">05 &middot; How to run it</p>
+    <h2>Docker Compose inside the wrapper</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Approach</th><th>Reproducible</th><th>Notes</th><th>Fit</th></tr></thead>
+        <tbody>
+          <tr><td>SteamCMD + systemd</td><td>manual</td><td>Fewest moving parts; you own every script</td><td class="verdict v-mid">OK</td></tr>
+          <tr><td>LinuxGSM (<code>cs2server</code>)</td><td>partial</td><td>Great on bare metal; not container-native</td><td class="verdict v-mid">OK</td></tr>
+          <tr class="pick"><td><strong>Docker Compose</strong></td><td>full (Git)</td><td><code>joedwards32/cs2</code> base, env-var config, auto game update on start</td><td class="verdict v-yes">PICK</td></tr>
+          <tr><td>Pterodactyl / Pelican</td><td>via panel</td><td>A control plane to secure &mdash; against the on-demand model</td><td class="verdict v-no">NO</td></tr>
+          <tr><td>Kubernetes + Agones</td><td>full</td><td>For scale-out matchmaking, not one box</td><td class="verdict v-no">NO</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="prose">
+      <p>The <a href="https://hub.docker.com/r/joedwards32/cs2"><code>joedwards32/cs2</code></a> image runs as a non-root <code>steam</code> user, updates the game on container start, and exposes everything through environment variables (<code>SRCDS_TOKEN</code>, <code>CS2_RCONPW</code>, <code>CS2_PW</code>, <code>CS2_MAXPLAYERS</code>, <code>CS2_STARTMAP</code>, GOTV settings&hellip;). One service, two profiles: <code>full</code> (with mods) and <code>vanilla</code> (fallback for the days a CS2 patch breaks Metamod). Bake the pinned <code>addons/</code> tree into the golden snapshot so no mod install happens at boot.</p>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">06 &middot; The mod stack</p>
+    <h2>Metamod &rarr; CounterStrikeSharp &rarr; MatchZy</h2>
+    <div class="prose">
+      <ol>
+        <li><strong>Metamod:Source</strong> (dev branch) &mdash; the loader, registered in <code>gameinfo.gi</code>.</li>
+        <li><strong>CounterStrikeSharp</strong> &mdash; the C# plugin runtime nearly every current plugin targets.</li>
+        <li><strong>MatchZy</strong> &mdash; the de-facto <em>get5</em> successor: knife round, side pick, pause / tech-pause, per-match configs, demo recording. <strong>Practice mode is built in</strong> (<code>.prac</code> / <code>.exitprac</code>: nade spawns, bot placement, trajectories). It supports <strong>1v1 through 5v5 natively</strong> (auto-pause is 5v5-only); <code>players_per_team</code> is configurable.</li>
+        <li><em>Optional:</em> <strong>cs2-retakes</strong>, a deathmatch plugin for warmup, <strong>CS2-SimpleAdmin</strong> for bans / kicks / map changes.</li>
+      </ol>
+      <p>With a single instance you run one mode at a time &mdash; switch between practice, retake and match with <code>exec</code> configs, driven by <code>gameday up --mode</code>.</p>
+    </div>
+    <div class="note warn">
+      <span class="tag">the recurring gotcha</span>
+      <p>Most large CS2 patches <strong>break Metamod and CounterStrikeSharp</strong> until both rebuild (symptom: an <code>undefined symbol</code> load error, seen repeatedly through 2026). You can't pin the game &mdash; the server must match the client build. On-demand actually helps: you find out at <code>gameday up</code> time, and the health check drops you to the <code>vanilla</code> profile so casual play still works. Rebuild the golden snapshot once the mods catch up.</p>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">07 &middot; Repo &amp; provisioning</p>
+    <h2>Bootstrap once, session on demand</h2>
+    <pre><code>cs-server/
+  <span class="c-key">terraform/</span>
+    bootstrap/          <span class="c-com"># applied once: reserved IP, firewall, SSH key, Storage Box</span>
+    session/            <span class="c-com"># ephemeral: the server (+ volume attach); apply / destroy per game night</span>
+  <span class="c-key">packer/</span>               <span class="c-com"># golden-image build: base OS + CS2 + pinned addons -&gt; snapshot</span>
+  <span class="c-key">cloud-init/</span>           <span class="c-com"># runs on boot: compose up, session env, mod health-check</span>
+  <span class="c-key">compose/</span>
+    docker-compose.yml  <span class="c-com"># one service: cs2 (+ gotv)   profiles: [full, vanilla]</span>
+  <span class="c-key">cfg/</span>                  <span class="c-com"># server.cfg, prac.cfg, retake.cfg, match_*.cfg, gamemodes_server.txt</span>
+  <span class="c-key">addons/</span>               <span class="c-com"># PINNED: metamod/ counterstrikesharp/ MatchZy/ ...</span>
+  <span class="c-key">secrets.enc.env</span>       <span class="c-com"># SOPS + age: GSLT, rcon_password, sv_password</span>
+  <span class="c-key">bin/gameday</span>          <span class="c-com"># up | down | build | status  -&gt; wraps terraform -chdir=terraform/session</span>
+  <span class="c-key">.github/workflows/</span>    <span class="c-com"># lint on PR; workflow_dispatch: gameday up/down with inputs; nightly reaper</span></code></pre>
+    <div class="prose">
+      <ul>
+        <li><strong>Split state.</strong> <code>gameday down</code> runs <code>terraform -chdir=terraform/session destroy</code> and never touches the IP or firewall in <code>bootstrap/</code>.</li>
+        <li><strong>Reserved IP</strong>: <code>hcloud_primary_ip</code> with <code>auto_delete = false</code> (or <code>hcloud_floating_ip</code>), read by the session config through a data source and reassigned on each create.</li>
+        <li><strong>Golden image</strong>: Packer's Hetzner builder boots a temp server, installs the game + pinned mods, snapshots, destroys. Re-run when you bump mod versions &mdash; <code>gameday build</code> is a thin wrapper.</li>
+        <li><strong>Secrets</strong>: SOPS + age; decrypted on the server at boot, never plaintext in Git.</li>
+        <li><strong>State backend</strong>: Terraform Cloud free tier, or Cloudflare R2 / Backblaze B2 (Hetzner has no S3).</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">08 &middot; Config essentials</p>
+    <h2>One config, parametrised per session</h2>
+    <pre><code><span class="c-com">// gameday writes these from --format / --map / --mode</span>
+<span class="c-com">//   gameday up --format 6v6 --map de_nuke --mode competitive</span>
+<span class="c-key">maxplayers</span>            16          <span class="c-com">// 2 * players_per_team + a couple of spectators</span>
+<span class="c-key">sv_password</span>           <span class="c-str">"&lt;from .env&gt;"</span>
+<span class="c-key">rcon_password</span>         <span class="c-str">"&lt;from .env, 24+ random chars&gt;"</span>
+<span class="c-key">sv_setsteamaccount</span>    <span class="c-str">"&lt;the one GSLT&gt;"</span>
+<span class="c-key">sv_lan</span>                0
+
+<span class="c-com">// competitive, any team size</span>
+<span class="c-key">game_type</span> 0 ; <span class="c-key">game_mode</span> 1
+<span class="c-key">sv_hibernate_when_empty</span> 1
+
+<span class="c-com">// MatchZy match config (per session): "players_per_team": 6</span>
+<span class="c-com">// GOTV</span>
+<span class="c-key">tv_enable</span> 1 ; <span class="c-key">tv_port</span> 27020 ; <span class="c-key">tv_delay</span> 90</code></pre>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Service</th><th>Port</th><th>Proto</th><th>Exposure</th></tr></thead>
+        <tbody>
+          <tr><td>cs2 (game)</td><td class="num">27015</td><td>UDP</td><td class="verdict v-yes">world</td></tr>
+          <tr><td>GOTV relay</td><td class="num">27020</td><td>UDP</td><td class="verdict v-yes">world</td></tr>
+          <tr><td>RCON</td><td class="num">27015</td><td>TCP</td><td class="verdict v-no">WireGuard / admin IP only</td></tr>
+          <tr><td>SSH</td><td class="num">22</td><td>TCP</td><td class="verdict v-mid">WireGuard / your IP only</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">MatchZy covers 1v1&ndash;5v5 with its full match flow; for 6v6&ndash;8v8 "house match" nights, run a plain competitive (or wingman-style) config with <code>maxplayers</code> set and skip the match flow. RCON auth is plaintext and brute-forceable &mdash; it must never face <code>0.0.0.0</code>.</p>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">09 &middot; Operations</p>
+    <h2>The safety nets that make on-demand safe</h2>
+    <div class="prose">
+      <h3>The reaper</h3>
+      <ul>
+        <li>A scheduled GitHub Actions job (hourly) runs <code>hcloud server list</code> and destroys any <code>cs2-session</code> server older than N hours, or empty (RCON player count 0) for 30&nbsp;minutes. This is the single most important piece of the on-demand model.</li>
+        <li>Worst case without it: a CCX13 left running a whole month &asymp; <strong>&euro;15</strong> (Hetzner caps hourly at the monthly rate) &mdash; annoying, not ruinous. The reaper makes it a non-issue.</li>
+      </ul>
+      <h3>Game &amp; mod updates</h3>
+      <ul>
+        <li>CS2 self-updates when the container starts &mdash; every <code>gameday up</code> is on the current build.</li>
+        <li>The boot health check verifies Metamod / CSSharp; on failure it starts the <code>vanilla</code> profile.</li>
+        <li>Rebuild the golden snapshot (<code>gameday build</code>) whenever you bump pinned mod versions &mdash; every few weeks.</li>
+      </ul>
+      <h3>Demos &amp; backups</h3>
+      <ul>
+        <li><code>gameday down</code> rsyncs <code>demos/</code> to a Storage Box (BX11, 1&nbsp;TB, ~&euro;3.80/mo) before destroying &mdash; or, with the Volume approach, they persist there automatically.</li>
+        <li>Configs + addons are in Git; the snapshot is reproducible from Packer.</li>
+      </ul>
+      <h3>Monitoring</h3>
+      <ul>
+        <li>Short sessions make heavy monitoring pointless. Pull <code>stats</code> over RCON during a match; if <code>sv</code> variance climbs on a shared-vCPU plan, move up to CCX13 / CCX23.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">10 &middot; Security checklist</p>
+    <h2>Before you hand out the IP</h2>
+    <ul class="check">
+      <li>Firewall lives in <code>bootstrap/</code> (long-lived): game + GOTV UDP to the world, SSH to your IP / WireGuard only.</li>
+      <li>SSH: key-only, <code>PermitRootLogin no</code>, <code>PasswordAuthentication no</code>, fail2ban.</li>
+      <li>Containers run as non-root (image default <code>steam</code>, uid 1000); never mount <code>docker.sock</code>.</li>
+      <li>Unique 24+ char <code>rcon_password</code> and <code>sv_password</code>, generated, stored in SOPS.</li>
+      <li>RCON reachable only via WireGuard / a single admin IP &mdash; never public.</li>
+      <li>Treat CounterStrikeSharp plugins as <strong>arbitrary code in your server process</strong> &mdash; install only from reputable repos, pin to a release tag or commit hash.</li>
+      <li>The reaper doubles as a security control: the box simply doesn't exist most of the time.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">11 &middot; Cost</p>
+    <h2>Monthly, EUR, approximate</h2>
+    <p class="prose">Assume ~3 sessions/week &times; 4&nbsp;hours &asymp; <strong>48 hours/month</strong>.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Line item</th><th>On-demand CCX13</th><th>On-demand CX32 (casual)</th><th>Always-on CPX31</th></tr></thead>
+        <tbody>
+          <tr><td>Compute</td><td class="num">48h &times; 0.066 &asymp; 3.20</td><td class="num">48h &times; 0.011 &asymp; 0.55</td><td class="num">~16 (flat)</td></tr>
+          <tr><td>Golden snapshot</td><td class="num">~0.75</td><td class="num">~0.75</td><td class="num">&mdash;</td></tr>
+          <tr><td>Reserved Primary IP</td><td class="num">0.50</td><td class="num">0.50</td><td class="num">incl.</td></tr>
+          <tr><td>Storage Box (demos, optional)</td><td class="num">~3.80</td><td class="num">~3.80</td><td class="num">~3.80</td></tr>
+          <tr><td>GSLT</td><td class="num">free</td><td class="num">free</td><td class="num">free</td></tr>
+          <tr><td><strong>Total (no Storage Box)</strong></td><td class="num"><strong>~4.5</strong></td><td class="num"><strong>~1.8</strong></td><td class="num"><strong>~16</strong></td></tr>
+          <tr><td><strong>Total (with Storage Box)</strong></td><td class="num"><strong>~8.3</strong></td><td class="num"><strong>~5.6</strong></td><td class="num"><strong>~20</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">Keep the last few demos on the snapshot or volume and skip the Storage Box entirely. If the reaper ever fails and a CCX13 runs a full month, the bill caps at ~&euro;15 &mdash; not &euro;43. Hetzner raised cloud prices several times through 2026, so confirm current rates on the <a href="https://www.hetzner.com/cloud">pricing page</a>.</p>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">12 &middot; Next steps</p>
+    <h2>From zero to <code>connect</code></h2>
+    <ol class="steps">
+      <li>One dedicated Steam account &rarr; one GSLT (App&nbsp;730).</li>
+      <li>Hetzner project + API token. <code>terraform/bootstrap</code>: reserved Primary IP, firewall (27015 / 27020 UDP world; 22 your IP), SSH key, optional Storage Box.</li>
+      <li><code>packer build</code> the golden snapshot: Debian + Docker + SteamCMD/CS2 + pinned <code>addons/</code>.</li>
+      <li><code>terraform/session</code>: CCX13 from that snapshot, reassign the IP; cloud-init runs <code>compose up</code> with the session env.</li>
+      <li><code>bin/gameday up --format 5v5 --map de_anubis</code> &rarr; get the connect string &rarr; test ping + a match.</li>
+      <li><code>bin/gameday down</code> &rarr; demos synced, server destroyed. Check the invoice shows only hours used.</li>
+      <li>Add the nightly reaper workflow + a <code>workflow_dispatch</code> to start game nights from your phone.</li>
+    </ol>
+    <div class="note info">
+      <span class="tag">this repo</span>
+      <p>The working directory is set up for exactly this. Next move is scaffolding <code>terraform/bootstrap</code>, <code>terraform/session</code>, <code>packer/</code>, <code>compose/</code> and <code>bin/gameday</code> with real files &mdash; say the word and I'll draft them for review (diffs first; tests for the <code>gameday</code> and reaper logic).</p>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="sec-label">13 &middot; Next steps &middot; once the server works</p>
+    <h2>Player tracking via GSI</h2>
+    <div class="prose">
+      <p>A separate side project already exists: a Swift CLI running a small webserver that implements Valve's <strong>Game State Integration</strong> (GSI) &mdash; it receives JSON POSTs and tracks either personal in-match stats or full server/team stats while spectating. The idea is to point it at this server once game nights are actually happening.</p>
+    </div>
+
+    <div class="note warn">
+      <span class="tag">sync first</span>
+      <p>Nothing below is committed to. This section exists so the idea isn't lost, not as a queued task &mdash; <strong>sync up before building any of it</strong>, once the base server (&sect;12) is actually working.</p>
+    </div>
+
+    <div class="prose">
+      <p>The one thing worth internalising now, since it shapes every option below: <strong>GSI is a client-side feature.</strong> The JSON POSTs come from each person's local CS2 client, via a <code>gamestate_integration_*.cfg</code> dropped into their own <code>csgo/cfg/</code> &mdash; not from the dedicated server. The receiver's address has nothing to do with the game's <code>connect</code> string; it's just an HTTP endpoint the client is told to talk to.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Approach</th><th>Data richness</th><th>Setup cost</th><th>Notes</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr class="pick"><td>Friends run their own <strong><code>gamestate_integration_*.cfg</code></strong></td><td>Own perspective; full match if spectating</td><td>Low &mdash; copy a generated file</td><td>Standard GSI use case; works against a plain vanilla server, no addons needed</td><td class="verdict v-yes">START HERE</td></tr>
+          <tr><td>Dummy spectator client sending GSI</td><td>Full match, spectator's fog-of-war limits</td><td>High</td><td>Needs a second full CS2 client logged into Steam, likely headless (Xvfb, no GPU) &mdash; fragile, anti-cheat/account risk</td><td class="verdict v-no">AVOID</td></tr>
+          <tr><td>CounterStrikeSharp plugin &rarr; webhook</td><td>Full server-authoritative state, no fog-of-war</td><td>Medium &mdash; C# plugin dev</td><td>Rides on the &sect;06 mod stack (phase 7); strictly richer than any single client's GSI; no client config needed</td><td class="verdict v-mid">LATER OPTION</td></tr>
+          <tr><td>MatchZy's built-in webhook</td><td>Match/round events only, no positional data</td><td>Very low &mdash; a cvar</td><td>Good enough for scoreboard-level stats; also phase 7</td><td class="verdict v-mid">LOW-EFFORT ALT</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose">
+      <p>If the client-config route is picked, the receiver most likely lives on the ephemeral session box itself: bind it to the existing reserved Primary IP on a second port, add one firewall rule alongside 27015/27020, and it inherits the same create-with-the-session, gone-when-you're-done lifecycle as the game itself &mdash; no separate always-on box or home-network port-forwarding.</p>
+    </div>
+
+    <ul class="check">
+      <li>A <code>gameday gsi-config [--name friend]</code> command that prints a ready-to-paste <code>gamestate_integration_*.cfg</code>, with the reserved IP baked in and a token per friend (so access can be revoked per-person without touching everyone else's file).</li>
+      <li>The receiver as one more service in <code>compose/docker-compose.yml</code>, started by the same cloud-init as the game container.</li>
+      <li>Decide later whether the CounterStrikeSharp-plugin path (richer, no client install) should replace the per-client GSI files once phase 7 lands, or the two coexist &mdash; GSI for personal perspective, the plugin for full-server spectating stats.</li>
+    </ul>
+  </section>
+
+  <footer class="wrap">
+    <p>Compiled from public documentation and community sources, September 2026. Prices and plan specs drift &mdash; verify before you buy. CS2 modding tracks Valve's release cadence; expect churn.</p>
+    <div class="src-list">
+      <a href="https://cloudtally.eu/blog/why-hetzner-charges-for-stopped-servers">CloudTally &mdash; why Hetzner charges for stopped servers</a>
+      <a href="https://docs.hetzner.com/cloud/servers/primary-ips/faq/">Hetzner Docs &mdash; Primary IPs FAQ</a>
+      <a href="https://weap.io/learn/hetzner/hetzner-snapshots-explained">weap.io &mdash; Hetzner snapshots explained</a>
+      <a href="https://community.hetzner.com/tutorials/howto-hcloud-terraform/">Hetzner Community &mdash; hcloud Terraform provider</a>
+      <a href="https://community.hetzner.com/tutorials/game-server-cs2/">Hetzner Community &mdash; CS2 dedicated server tutorial</a>
+      <a href="https://hub.docker.com/r/joedwards32/cs2">Docker Hub &mdash; joedwards32/cs2</a>
+      <a href="https://github.com/shobhit-pathak/MatchZy">GitHub &mdash; shobhit-pathak/MatchZy</a>
+      <a href="https://shobhit-pathak.github.io/MatchZy/configuration/">MatchZy docs &mdash; configuration &amp; players_per_team</a>
+      <a href="https://github.com/roflmuffin/CounterStrikeSharp">GitHub &mdash; roflmuffin/CounterStrikeSharp</a>
+      <a href="https://supercraft.host/wiki/counter-strike-2/sourcemod_metamod/">supercraft.host &mdash; Metamod / CSSharp status</a>
+      <a href="https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/">Hetzner Docs &mdash; 2026 price adjustments</a>
+      <a href="https://cloudtally.eu/blog/hetzner-cloud-billing-explained">CloudTally &mdash; Hetzner Cloud billing explained</a>
+      <a href="https://northflank.com/blog/hetzner-cloud-server-price-increases">Northflank &mdash; Hetzner 2026 price increases</a>
+      <a href="https://serverspace.io/about/blog/best-vps-for-cs2-server-2026/">Serverspace &mdash; best VPS for a CS2 server 2026</a>
+      <a href="https://evezone.evetech.co.za/performance-pulse/cs2-cpu-usage-cores-frequency-2026/">evetech &mdash; CS2 CPU cores &amp; frequency</a>
+      <a href="https://github.com/sebastianspicker/cs2-auto-update">GitHub &mdash; cs2-auto-update</a>
+    </div>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById("themeToggle");
+    var order = ["auto", "light", "dark"];
+    var stored;
+    try { stored = localStorage.getItem("cs2plan-theme"); } catch (e) { stored = null; }
+    var state = order.indexOf(stored) > -1 ? stored : "auto";
+    apply(state);
+    btn.addEventListener("click", function () {
+      state = order[(order.indexOf(state) + 1) % order.length];
+      apply(state);
+      try { localStorage.setItem("cs2plan-theme", state); } catch (e) {}
+    });
+    function apply(s) {
+      if (s === "auto") { document.documentElement.removeAttribute("data-theme"); }
+      else { document.documentElement.setAttribute("data-theme", s); }
+      btn.textContent = "theme: " + s;
+    }
+  })();
+</script>
