@@ -76,9 +76,12 @@ write_files:
       CS2_MAXPLAYERS=${maxplayers}
       CS2_STARTMAP=${startmap}
       CS2_GAMEALIAS=${gamealias}
+      CS2_GAMETYPE=${game_type}
+      CS2_GAMEMODE=${game_mode}
+      CS2_MAPGROUP=${mapgroup}
       CS2_TV_DELAY=${tv_delay}
       CS2_MODS=${mods}
-      CS2_GAMEMODE=${gamemode}
+      GAMEDAY_STACK=${stack}
 
 runcmd:
   # --- mount the persistent data volume at /opt/cs2/data ---

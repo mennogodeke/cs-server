@@ -52,3 +52,13 @@ cs2_parse_format() {
   local per_side=$(( a > b ? a : b ))
   echo $(( per_side * 2 + 3 ))
 }
+
+# cs2_default_format MODE
+#   Prints the team format used when `gameday up` gets no --format.
+#   Rush is Valve's 3v3 mode; everything else defaults to 5v5.
+cs2_default_format() {
+  case "${1:-}" in
+    rush) echo "3v3" ;;
+    *)    echo "5v5" ;;
+  esac
+}

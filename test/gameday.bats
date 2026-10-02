@@ -79,3 +79,30 @@ setup() {
   [ "$status" -eq 0 ]
   ! grep -v '/game/csgo/demos$' <<<"$output"
 }
+
+@test "default_format: rush defaults to 3v3" {
+  run cs2_default_format rush
+  [ "$status" -eq 0 ]
+  [ "$output" = "3v3" ]
+}
+
+@test "default_format: other modes default to 5v5" {
+  for mode in matchzy prophunt vanilla; do
+    run cs2_default_format "$mode"
+    [ "$output" = "5v5" ]
+  done
+}
+
+@test "gameday up rejects an unknown --mode before touching terraform" {
+  run "$GAMEDAY" up --mode florp
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unknown mode"* ]]
+}
+
+@test "pre.sh reads its stack from GAMEDAY_STACK, not CS2_GAMEMODE" {
+  # The image's entry.sh treats CS2_GAMEMODE as the numeric game_mode
+  # whenever CS2_GAMEALIAS is empty (rush), so it can't double as our stack name.
+  run grep -nE '\$\{?CS2_GAMEMODE' "$BATS_TEST_DIRNAME/../scripts/pre.sh"
+  [ "$status" -ne 0 ]
+  grep -q 'GAMEDAY_STACK' "$BATS_TEST_DIRNAME/../scripts/pre.sh"
+}

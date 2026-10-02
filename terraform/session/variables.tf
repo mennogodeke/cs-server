@@ -42,19 +42,19 @@ variable "format" {
 }
 
 variable "map" {
-  description = "Map the server starts on."
+  description = "Map the server starts on. Empty = the mode's default (rush_001 for rush, de_anubis otherwise)."
   type        = string
-  default     = "de_anubis"
+  default     = ""
 }
 
 variable "mode" {
-  description = "Which mod stack to run: matchzy (competitive, knife rounds etc) | prophunt | vanilla (no mods). Mutually exclusive — switching modes prunes the other stack's plugins from the persistent volume."
+  description = "Which mod stack to run: matchzy (competitive, knife rounds etc) | prophunt | vanilla (no mods) | rush (Valve's 3v3 Rush, no mods). Mutually exclusive — switching modes prunes the other stack's plugins from the persistent volume."
   type        = string
   default     = "matchzy"
 
   validation {
-    condition     = contains(["matchzy", "prophunt", "vanilla"], var.mode)
-    error_message = "mode must be one of: matchzy, prophunt, vanilla."
+    condition     = contains(["matchzy", "prophunt", "vanilla", "rush"], var.mode)
+    error_message = "mode must be one of: matchzy, prophunt, vanilla, rush."
   }
 }
 

@@ -2,7 +2,8 @@
 # gameday — create a CS2 server for a session, then destroy it afterwards.
 #
 #   gameday bootstrap [-- <terraform apply args>]   one-time: reserved IP, firewall, volume
-#   gameday up   [--format 5v5] [--map de_anubis] [--mode matchzy|prophunt|vanilla] [-y]
+#   gameday up   [--format 5v5] [--map de_anubis] [--mode matchzy|prophunt|vanilla|rush] [-y]
+#                rush defaults to --format 3v3 --map rush_001
 #   gameday down [-y]
 #   gameday status
 #   gameday connect
@@ -24,7 +25,7 @@ source "$HERE/_lib.sh"
 BOOTSTRAP_DIR="$ROOT/terraform/bootstrap"
 SESSION_DIR="$ROOT/terraform/session"
 
-usage() { sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 load_secrets() {
   case "${CS2_SECRET_SOURCE:-tfvars}" in
@@ -59,7 +60,7 @@ cmd_bootstrap() {
 }
 
 cmd_up() {
-  local format="5v5" map="de_anubis" mode="matchzy"
+  local format="" map="" mode="matchzy"
   local -a tf_extra=()
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -72,12 +73,19 @@ cmd_up() {
     esac
   done
 
+  case "$mode" in
+    matchzy|prophunt|vanilla|rush) ;;
+    *) cs2_die "unknown mode: $mode (want matchzy, prophunt, vanilla or rush)" ;;
+  esac
+  [[ -n "$format" ]] || format="$(cs2_default_format "$mode")"
+
   local maxplayers
   maxplayers="$(cs2_parse_format "$format")" || exit 1
 
   cs2_need terraform
   load_secrets
-  cs2_log "$format -> $maxplayers slots | map $map | mode $mode"
+  # An empty map lets Terraform pick the mode's default (rush_001 / de_anubis).
+  cs2_log "$format -> $maxplayers slots | map ${map:-<mode default>} | mode $mode"
   terraform -chdir="$SESSION_DIR" init -input=false
   terraform -chdir="$SESSION_DIR" apply "${tf_extra[@]+"${tf_extra[@]}"}" \
     -var "format=$format" -var "map=$map" -var "mode=$mode"

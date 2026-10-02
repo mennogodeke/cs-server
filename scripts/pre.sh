@@ -2,7 +2,7 @@
 # joedwards32/cs2's entry.sh `source`s this file (mounted read-only at
 # /home/steam/cs2-dedicated/pre.sh) right before it launches CS2 — cwd is
 # ${STEAMAPPDIR}/game/. Installs Metamod + CounterStrikeSharp (always, shared
-# foundation) plus exactly one gameplay stack selected by CS2_GAMEMODE:
+# foundation) plus exactly one gameplay stack selected by GAMEDAY_STACK:
 # "matchzy" (MatchZy) or "prophunt" (MultiAddonManager + CS2MenuManager +
 # PropHunt) — mutually exclusive, from ../versions.lock, idempotently. Also
 # registers Metamod in csgo/gameinfo.gi. (MultiAddonManager registers itself
@@ -20,7 +20,9 @@
 GAMEINFO="csgo/gameinfo.gi"
 VERSIONS_LOCK="../versions.lock"
 MARKER="csgo/addons/.gameday_versions"
-GAMEMODE="${CS2_GAMEMODE:-matchzy}"
+# Not CS2_GAMEMODE: the image's entry.sh reads that as the numeric game_mode
+# whenever CS2_GAMEALIAS is empty (which it is for --mode rush).
+GAMEMODE="${GAMEDAY_STACK:-matchzy}"
 
 _pre_log() { echo "[pre.sh] $*"; }
 
@@ -116,7 +118,7 @@ _deploy_prophunt_configs() {
   done
 }
 
-# The data volume persists across sessions, so switching CS2_GAMEMODE has to
+# The data volume persists across sessions, so switching GAMEDAY_STACK has to
 # actively remove the *other* stack's plugin folder — otherwise it just sits
 # there forever (never re-downloaded since versions.lock hasn't changed, but
 # also never deleted), and CounterStrikeSharp keeps loading it alongside

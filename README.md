@@ -79,7 +79,7 @@ CS2_SECRET_SOURCE=op ./bin/gameday up --format 6v6 --map de_nuke --mode matchzy
 ./bin/gameday down        # destroy the server. IP + volume stay.
 ```
 
-`--format` accepts `1v1`–`8v8`; slots = larger side × 2 + 3. `--mode` picks
+`--format` accepts `1v1`–`8v8` (default `5v5`, or `3v3` for rush); slots = larger side × 2 + 3. `--mode` picks
 which mod stack runs — mutually exclusive, switching prunes the other stack
 from the persistent volume:
 
@@ -88,6 +88,7 @@ from the persistent volume:
 | `matchzy` (default) | Metamod, CounterStrikeSharp, MatchZy — knife round, `!ready`, admin commands (`.map`, `.rcon`, etc.) |
 | `prophunt` | Metamod, CounterStrikeSharp, MultiAddonManager, CS2MenuManager, Prop Hunt |
 | `vanilla` | No mods at all — plain CS2, the safety valve for when a CS2 patch breaks the mod stack |
+| `rush` | Valve's 3v3 Rush mode (game type 0 / mode 6, map `rush_001`), no mods. Defaults to `--format 3v3` and `--map rush_001` |
 
 Add `-y` to skip the Terraform prompt. `export CS2_SECRET_SOURCE=op` in your
 shell profile to stop typing it every time.

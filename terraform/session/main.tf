@@ -27,14 +27,22 @@ locals {
   per_side   = max(local.sides[0], local.sides[1])
   maxplayers = local.per_side * 2 + 3 # + a few caster/spectator slots
 
-  # matchzy mode runs the competitive ruleset (MatchZy manages rounds/econ on
-  # top); prophunt runs on the more permissive casual ruleset since PropHunt
-  # manages its own round logic; vanilla defaults to competitive for plain play.
-  gamealias = {
-    matchzy  = "competitive"
-    prophunt = "casual"
-    vanilla  = "competitive"
-  }[var.mode]
+  # How each --mode maps onto CS2's game type/mode, read by the image's
+  # entry.sh: a non-empty alias wins (+game_alias); otherwise it passes
+  # +game_type/+game_mode. matchzy runs the competitive ruleset (MatchZy
+  # manages rounds/econ on top); prophunt runs on the more permissive casual
+  # ruleset since PropHunt manages its own round logic; vanilla defaults to
+  # competitive for plain play. Rush (added 2026-09-22) has no game_alias —
+  # `game_alias rush` is "unknown" — only type 0 / mode 6 in gamemodes.txt,
+  # with its own map group. Verified live on build 1.41.8.8.
+  game_modes = {
+    matchzy  = { alias = "competitive", type = 0, mode = 1, mapgroup = "mg_active", map = "de_anubis" }
+    prophunt = { alias = "casual", type = 0, mode = 0, mapgroup = "mg_active", map = "de_anubis" }
+    vanilla  = { alias = "competitive", type = 0, mode = 1, mapgroup = "mg_active", map = "de_anubis" }
+    rush     = { alias = "", type = 0, mode = 6, mapgroup = "mg_rush_001", map = "rush_001" }
+  }
+  game_mode = local.game_modes[var.mode]
+  startmap  = var.map != "" ? var.map : local.game_mode.map
 
   # Only matchzy mode installs MatchZy at all, so this only matters there —
   # autostart_mode 1 = match mode (waits for a real match via !ready /
@@ -45,7 +53,7 @@ locals {
     matchzy_autostart_mode 1
   EOF
 
-  # For prophunt/vanilla this is a harmless comment; nothing reads cfg/mode.cfg
+  # For prophunt/vanilla/rush this is a harmless comment; nothing reads cfg/mode.cfg
   # since MatchZy isn't installed in those modes.
   mode_cfg = var.mode == "matchzy" ? local.matchzy_mode_cfg : "// --mode=${var.mode}: MatchZy isn't installed in this mode, nothing to configure here.\n"
 
@@ -56,16 +64,21 @@ locals {
     rcon_password     = var.rcon_password
     tailscale_authkey = var.tailscale_authkey
     maxplayers        = local.maxplayers
-    startmap          = var.map
-    gamealias         = local.gamealias
+    startmap          = local.startmap
+    gamealias         = local.game_mode.alias
+    game_type         = local.game_mode.type
+    game_mode         = local.game_mode.mode
+    mapgroup          = local.game_mode.mapgroup
     tv_delay          = var.tv_delay
-    mods              = var.mode == "vanilla" ? "0" : "1"
-    gamemode          = var.mode
-    mode_cfg          = local.mode_cfg
-    compose_yml       = file("${path.module}/../../compose/docker-compose.yml")
-    server_cfg        = file("${path.module}/../../cfg/server.cfg")
-    pre_sh            = file("${path.module}/../../scripts/pre.sh")
-    versions_lock     = file("${path.module}/../../addons/versions.lock")
+    # Rush runs mod-free: MatchZy's warmup/match configs would fight Rush's
+    # own scripted rounds.
+    mods          = contains(["vanilla", "rush"], var.mode) ? "0" : "1"
+    stack         = var.mode
+    mode_cfg      = local.mode_cfg
+    compose_yml   = file("${path.module}/../../compose/docker-compose.yml")
+    server_cfg    = file("${path.module}/../../cfg/server.cfg")
+    pre_sh        = file("${path.module}/../../scripts/pre.sh")
+    versions_lock = file("${path.module}/../../addons/versions.lock")
     # admins.json / cssharp-admins.json hold real Steam64 IDs and are git-ignored
     # (see .gitignore); fall back to the committed *.example.json placeholders
     # when a real one isn't present locally.
