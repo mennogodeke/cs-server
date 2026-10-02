@@ -71,3 +71,11 @@ setup() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"unknown flag"* ]]
 }
+
+@test "compose never bind-mounts into the steamcmd-managed game/ tree (except demos)" {
+  # A bind mount over a file CS2 ships (e.g. server.cfg) makes steamcmd's
+  # commit fail with "installed file locked", cancelling every update.
+  run grep -E ':/home/steam/cs2-dedicated/game/' "$BATS_TEST_DIRNAME/../compose/docker-compose.yml"
+  [ "$status" -eq 0 ]
+  ! grep -v '/game/csgo/demos$' <<<"$output"
+}

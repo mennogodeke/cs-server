@@ -135,6 +135,23 @@ _prune_other_gamemode_stack() {
   fi
 }
 
+# server.cfg / mode.cfg are mounted flat at STEAMAPPDIR root (see
+# docker-compose.yml for why) and copied in here. pre.sh runs after entry.sh
+# has installed and templated the image's own server.cfg, so ours wins.
+_deploy_server_configs() {
+  local name
+  for name in server mode; do
+    [[ -f "../gameday-${name}.cfg" ]] || continue
+    if cp "../gameday-${name}.cfg" "csgo/cfg/${name}.cfg"; then
+      _pre_log "deployed ${name}.cfg"
+    else
+      _pre_log "WARNING: failed to deploy ${name}.cfg"
+    fi
+  done
+}
+
+_deploy_server_configs
+
 if [[ "${CS2_MODS:-1}" == "0" ]]; then
   _pre_log "CS2_MODS=0 — vanilla mode, skipping addon install"
   _unregister_metamod

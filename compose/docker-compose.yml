@@ -29,8 +29,11 @@ services:
       - "127.0.0.1:27016:27016/tcp"
     volumes:
       - ./data:/home/steam/cs2-dedicated
-      - ./cfg/server.cfg:/home/steam/cs2-dedicated/game/csgo/cfg/server.cfg:ro
-      - ./cfg/mode.cfg:/home/steam/cs2-dedicated/game/csgo/cfg/mode.cfg:ro
+      # Mounted flat, NOT at game/csgo/cfg/: server.cfg ships in the CS2 depot,
+      # and a bind mount there makes steamcmd's file commit fail ("installed
+      # file locked"), cancelling every update. pre.sh copies these into place.
+      - ./cfg/server.cfg:/home/steam/cs2-dedicated/gameday-server.cfg:ro
+      - ./cfg/mode.cfg:/home/steam/cs2-dedicated/gameday-mode.cfg:ro
       - ./data/demos:/home/steam/cs2-dedicated/game/csgo/demos
       - ./scripts/pre.sh:/home/steam/cs2-dedicated/pre.sh:ro
       - ./addons/versions.lock:/home/steam/cs2-dedicated/versions.lock:ro
