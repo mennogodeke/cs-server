@@ -15,26 +15,30 @@
 #   cs2menumanager      https://github.com/schwarper/CS2MenuManager/releases
 #   prophunt            https://github.com/exkludera-cssharp/PropHunt/releases
 #
-# Pinned 2026-09-16.
+# Pinned 2026-10-02.
 
 # Metamod dev builds are tagged "2.0.0.<N>" but the asset is named "...-git<N>-...";
 # pre.sh assumes the 2.0.0 prefix stays stable and only this build number changes.
 #
-# PINNED BELOW THE ACTUAL LATEST ON PURPOSE: Metamod 1461+ bumped its SourceHook
-# interface to 18, which CounterStrikeSharp v1.0.374 doesn't support yet
-# ("Plugin uses old SourceHook Metamod build ... (17 < 18)", 0 plugins loaded —
-# see https://github.com/roflmuffin/CounterStrikeSharp/issues/1415). Build 1411
-# is community-confirmed working with CSSharp v1.0.374 + MatchZy 0.8.15. Don't
-# bump past 1461 until CSSharp ships a rebuild against the newer interface.
-METAMOD_BUILD=1411
-METAMOD_SHA256=e3d4c3d457a1c86a5079e8bd8248a4a00361c7d0a3dce7c7e0c4c45458096649
+# Metamod 1461+ uses SourceHook interface 18. CSSharp v1.0.375+ *requires* it
+# ("Plugin requires newer Metamod version (18 > 17)" on 1411), older CSSharp
+# can't use it — bump these two together (CSSharp issue #1415).
+# Verified 2026-10-02 on CS2 build 25640462 (1.41.8.x): 1473 + v1.0.376 +
+# MatchZy 0.8.15 load cleanly.
+METAMOD_BUILD=1473
+METAMOD_SHA256=da3f612bdf53dda8876dd82cc5ea99858b34c9dc15bc130b65caa39f43630b1c
 
-COUNTERSTRIKESHARP=v1.0.374           # with-runtime build
-COUNTERSTRIKESHARP_SHA256=22a24aa482e226ad0dcdc72cec03e1927d267eb5a1566094e98809a06dcc6792
+# v1.0.375+ also clears the executable-stack flag on counterstrikesharp.so —
+# required since the pinned image's Debian 13 / glibc 2.41 refuses to dlopen
+# execstack libraries ("cannot enable executable stack ... Invalid argument").
+COUNTERSTRIKESHARP=v1.0.376           # with-runtime build
+COUNTERSTRIKESHARP_SHA256=8d50a25a467fe9c7ebbbc7032028d402cd428e118308f1c4d627a0a5ddf36783
 MATCHZY=0.8.15
 MATCHZY_SHA256=425955d7565df84915dd6002d0a7848546d3859d376cb493f2988ed182586b57
 
 # --- Prop Hunt stack (optional, extra weight on top of the above) ---
+# KNOWN BROKEN since the 2026-10-02 Metamod 1473 bump (MultiAddonManager v1.5.4
+# needs Metamod <= 1411). Not fixed on purpose: the prophunt mod is being replaced.
 # Each of these pins its own compatible Metamod ceiling — cross-checked against
 # METAMOD_BUILD=1411 above before pinning:
 #   multiaddonmanager v1.6 requires Metamod 1459+ (incompatible with us) — v1.5.4
