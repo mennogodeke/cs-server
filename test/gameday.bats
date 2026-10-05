@@ -106,3 +106,56 @@ setup() {
   [ "$status" -ne 0 ]
   grep -q 'GAMEDAY_STACK' "$BATS_TEST_DIRNAME/../scripts/pre.sh"
 }
+
+@test "prophunt_workshop_id: resolves each Prophunt map name" {
+  local pair
+  for pair in mirage=3615968422 inferno=3608612434 office=3644811896 \
+              nuke=3711322683 dust2=3758986810; do
+    run cs2_prophunt_workshop_id "${pair%%=*}"
+    [ "$status" -eq 0 ]
+    [ "$output" = "${pair#*=}" ]
+  done
+}
+
+@test "prophunt_workshop_id: passes a raw numeric workshop ID through" {
+  run cs2_prophunt_workshop_id 1234567890
+  [ "$status" -eq 0 ]
+  [ "$output" = "1234567890" ]
+}
+
+@test "prophunt_workshop_id: rejects official map names and lists the valid ones" {
+  run cs2_prophunt_workshop_id de_dust2
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unknown prophunt map"* ]]
+  [[ "$output" == *"mirage"* && "$output" == *"office"* ]]
+}
+
+@test "gameday up --mode prophunt rejects an unknown --map before touching terraform" {
+  # Stub terraform so a regression here fails loudly instead of running a real apply.
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  printf '#!/bin/sh\necho "terraform was called" >&2\nexit 99\n' > "$BATS_TEST_TMPDIR/bin/terraform"
+  chmod +x "$BATS_TEST_TMPDIR/bin/terraform"
+  PATH="$BATS_TEST_TMPDIR/bin:$PATH" run "$GAMEDAY" up --mode prophunt --map de_dust2
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unknown prophunt map"* ]]
+  [[ "$output" != *"terraform was called"* ]]
+}
+
+@test "the PropHunt plugin stack is gone from compose and versions.lock" {
+  run grep -n 'prophunt-' "$BATS_TEST_DIRNAME/../compose/docker-compose.yml"
+  [ "$status" -eq 1 ]
+  run grep -nE '^(PROPHUNT|MULTIADDONMANAGER|CS2MENUMANAGER)' "$BATS_TEST_DIRNAME/../addons/versions.lock"
+  [ "$status" -eq 1 ]
+}
+
+@test "pre.sh prunes the old PropHunt stack from the volume, even with mods off" {
+  # Left behind on the persistent volume, Metamod would load MultiAddonManager
+  # v1.5.4's vdf in the next matchzy session — incompatible with Metamod 1473.
+  local game="$BATS_TEST_TMPDIR/game"
+  mkdir -p "$game/csgo/addons/metamod" "$game/csgo/addons/counterstrikesharp/plugins/PropHunt"
+  touch "$game/csgo/addons/metamod/multiaddonmanager.vdf"
+  run bash -c "cd '$game' && CS2_MODS=0 GAMEDAY_STACK=prophunt source '$BATS_TEST_DIRNAME/../scripts/pre.sh'"
+  [ "$status" -eq 0 ]
+  [ ! -e "$game/csgo/addons/metamod/multiaddonmanager.vdf" ]
+  [ ! -e "$game/csgo/addons/counterstrikesharp/plugins/PropHunt" ]
+}

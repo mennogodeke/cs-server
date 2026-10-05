@@ -2,12 +2,10 @@
 # joedwards32/cs2's entry.sh `source`s this file (mounted read-only at
 # /home/steam/cs2-dedicated/pre.sh) right before it launches CS2 — cwd is
 # ${STEAMAPPDIR}/game/. Installs Metamod + CounterStrikeSharp (always, shared
-# foundation) plus exactly one gameplay stack selected by GAMEDAY_STACK:
-# "matchzy" (MatchZy) or "prophunt" (MultiAddonManager + CS2MenuManager +
-# PropHunt) — mutually exclusive, from ../versions.lock, idempotently. Also
-# registers Metamod in csgo/gameinfo.gi. (MultiAddonManager registers itself
-# via its own addons/metamod/multiaddonmanager.vdf — no gameinfo.gi edit
-# needed for it.)
+# foundation) plus MatchZy when GAMEDAY_STACK is "matchzy", from
+# ../versions.lock, idempotently. Also registers Metamod in csgo/gameinfo.gi.
+# The other stacks (prophunt, vanilla, rush) run with CS2_MODS=0 — prophunt's
+# game mode lives in its workshop maps' cs_script, not in an addon.
 #
 # IMPORTANT: this file is *sourced*, not executed as a subprocess — a `set -e`
 # or a bare `exit` here would abort entry.sh itself and the CS2 launch with
@@ -100,24 +98,6 @@ _deploy_admin_configs() {
   fi
 }
 
-# Overrides PropHunt's shipped per-map prop-model lists (see cfg/prophunt/).
-# The destination dir already exists (created by extracting PropHunt itself,
-# owned correctly since that extraction runs as this same user) — no mkdir -p
-# ownership dance needed here, unlike _deploy_admin_configs above.
-_deploy_prophunt_configs() {
-  local dest="csgo/addons/counterstrikesharp/plugins/PropHunt/maps"
-  [[ -d "$dest" ]] || return 0
-  for f in ../prophunt-*.txt; do
-    [[ -f "$f" ]] || continue
-    local mapname="${f##*/prophunt-}"
-    if cp "$f" "$dest/$mapname"; then
-      _pre_log "deployed PropHunt map config: $mapname"
-    else
-      _pre_log "WARNING: failed to deploy PropHunt map config: $mapname"
-    fi
-  done
-}
-
 # The data volume persists across sessions, so switching GAMEDAY_STACK has to
 # actively remove the *other* stack's plugin folder — otherwise it just sits
 # there forever (never re-downloaded since versions.lock hasn't changed, but
@@ -128,13 +108,20 @@ _prune_other_gamemode_stack() {
   if [[ "$GAMEMODE" != "matchzy" ]]; then
     rm -rf csgo/addons/counterstrikesharp/plugins/MatchZy csgo/cfg/MatchZy
   fi
-  if [[ "$GAMEMODE" != "prophunt" ]]; then
-    rm -rf csgo/addons/counterstrikesharp/plugins/PropHunt \
-      csgo/addons/counterstrikesharp/plugins/CS2MenuManager_MenuManager \
-      csgo/addons/metamod/multiaddonmanager.vdf \
-      csgo/addons/multiaddonmanager \
-      csgo/cfg/multiaddonmanager
-  fi
+}
+
+# The PropHunt CounterStrikeSharp plugin stack (MultiAddonManager +
+# CS2MenuManager + PropHunt) was replaced by the cs_script Prophunt workshop
+# maps, which need no addons. Volumes from before that still carry its files,
+# and MultiAddonManager's vdf registers itself with Metamod — left in place,
+# the next matchzy session would load v1.5.4 against Metamod 1473
+# (incompatible). Runs every boot, mods on or off; a no-op once clean.
+_prune_legacy_prophunt_plugin() {
+  rm -rf csgo/addons/counterstrikesharp/plugins/PropHunt \
+    csgo/addons/counterstrikesharp/plugins/CS2MenuManager_MenuManager \
+    csgo/addons/metamod/multiaddonmanager.vdf \
+    csgo/addons/multiaddonmanager \
+    csgo/cfg/multiaddonmanager
 }
 
 # server.cfg / mode.cfg are mounted flat at STEAMAPPDIR root (see
@@ -153,6 +140,7 @@ _deploy_server_configs() {
 }
 
 _deploy_server_configs
+_prune_legacy_prophunt_plugin
 
 if [[ "${CS2_MODS:-1}" == "0" ]]; then
   _pre_log "CS2_MODS=0 — vanilla mode, skipping addon install"
@@ -165,7 +153,7 @@ else
   mkdir -p csgo/addons
   _prune_other_gamemode_stack
 
-  want="gamemode:${GAMEMODE} metamod:${METAMOD_BUILD:-} cssharp:${COUNTERSTRIKESHARP:-} matchzy:${MATCHZY:-} mam:${MULTIADDONMANAGER:-} menumgr:${CS2MENUMANAGER:-} prophunt:${PROPHUNT:-}"
+  want="gamemode:${GAMEMODE} metamod:${METAMOD_BUILD:-} cssharp:${COUNTERSTRIKESHARP:-} matchzy:${MATCHZY:-}"
   have=""
   [[ -f "$MARKER" ]] && have="$(cat "$MARKER" 2>/dev/null)"
 
@@ -211,48 +199,6 @@ else
       fi
     fi
 
-    if [[ "$GAMEMODE" == "prophunt" && -n "${MULTIADDONMANAGER:-}" ]]; then
-      _pre_log "installing MultiAddonManager ${MULTIADDONMANAGER}"
-      if curl -fsSL "https://github.com/Source2ZE/MultiAddonManager/releases/download/${MULTIADDONMANAGER}/MultiAddonManager-${MULTIADDONMANAGER}-steamrt3.tar.gz" -o /tmp/mam.tar.gz \
-        && _verify_sha256 /tmp/mam.tar.gz "${MULTIADDONMANAGER_SHA256:-}" \
-        && tar xzf /tmp/mam.tar.gz -C csgo; then
-        rm -f /tmp/mam.tar.gz
-      else
-        _pre_log "WARNING: MultiAddonManager download/verify/extract failed — leaving existing install (if any) untouched"
-        all_ok=0
-      fi
-    fi
-
-    # CS2MenuManager and PropHunt are CSSharp plugins whose archives are rooted
-    # at addons/counterstrikesharp/ already (unlike the four above, which are
-    # rooted at csgo/) — extract one directory deeper.
-    if [[ "$GAMEMODE" == "prophunt" && -n "${CS2MENUMANAGER:-}" ]]; then
-      _pre_log "installing CS2MenuManager ${CS2MENUMANAGER}"
-      menumgr_num="${CS2MENUMANAGER#v1.0.}"
-      mkdir -p csgo/addons/counterstrikesharp
-      if curl -fsSL "https://github.com/schwarper/CS2MenuManager/releases/download/${CS2MENUMANAGER}/CS2MenuManager-v${menumgr_num}.zip" -o /tmp/menumgr.zip \
-        && _verify_sha256 /tmp/menumgr.zip "${CS2MENUMANAGER_SHA256:-}" \
-        && unzip -oq /tmp/menumgr.zip -d csgo/addons/counterstrikesharp; then
-        rm -f /tmp/menumgr.zip
-      else
-        _pre_log "WARNING: CS2MenuManager download/verify/extract failed — leaving existing install (if any) untouched"
-        all_ok=0
-      fi
-    fi
-
-    if [[ "$GAMEMODE" == "prophunt" && -n "${PROPHUNT:-}" ]]; then
-      _pre_log "installing PropHunt ${PROPHUNT}"
-      mkdir -p csgo/addons/counterstrikesharp
-      if curl -fsSL "https://github.com/exkludera-cssharp/PropHunt/releases/download/${PROPHUNT}/PropHunt_${PROPHUNT}.zip" -o /tmp/prophunt.zip \
-        && _verify_sha256 /tmp/prophunt.zip "${PROPHUNT_SHA256:-}" \
-        && unzip -oq /tmp/prophunt.zip -d csgo/addons/counterstrikesharp; then
-        rm -f /tmp/prophunt.zip
-      else
-        _pre_log "WARNING: PropHunt download/verify/extract failed — leaving existing install (if any) untouched"
-        all_ok=0
-      fi
-    fi
-
     if [[ "$all_ok" == "1" ]]; then
       echo "$want" > "$MARKER"
       _pre_log "addons installed at pinned versions"
@@ -263,5 +209,4 @@ else
 
   _register_metamod
   _deploy_admin_configs
-  [[ "$GAMEMODE" == "prophunt" ]] && _deploy_prophunt_configs
 fi

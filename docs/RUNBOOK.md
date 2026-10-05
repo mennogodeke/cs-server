@@ -131,7 +131,7 @@ Iterate until `up → playable` is reliable and unattended, then move on.
 
 - [ ] `./bin/gameday up` again → CS2 does **not** re-download; server ready in 2–4 min. If it re-downloads, phase 2 issue #1 isn't actually fixed.
 - [ ] `./bin/gameday up --format 3v3` → server console `sv_visiblemaxplayers` / `status` reflects ~9 slots.
-- [ ] `--format 8v8 --map de_nuke --mode prophunt` → map + mode propagate.
+- [ ] `--format 8v8 --map nuke --mode prophunt` → map + mode propagate.
 - [ ] `./bin/gameday status` and `./bin/gameday connect` behave.
 - [ ] `./bin/gameday down`.
 
@@ -257,6 +257,19 @@ the online one directly.
    nothing to swap *to*) — expanded to 6 real prop paths pulled from the
    game's own `pak01_dir.vpk` (its path strings are plain ASCII, readable
    without a VPK tool).
+8. [ ] **Prop Hunt → cs_script workshop maps** (2026-10-05) — **replaces**
+   step 7. The plugin stack broke with the Metamod 1473 bump
+   (MultiAddonManager v1.5.4 needs Metamod ≤ 1411) and PropHunt itself had a
+   single 0.0.1 release. The community Prophunt maps (Mirage, Inferno,
+   Office, Nuke, Dust2 — collection `3692550841`, 100k+ subscribers each,
+   updated by their author after CS2 patches) carry the whole game mode in
+   Valve's own cs_script, so `--mode prophunt` now runs with `CS2_MODS=0`
+   and just sets `CS2_HOST_WORKSHOP_MAP` / `CS2_HOST_WORKSHOP_COLLECTION`
+   for the image's `entry.sh`. `gameday` resolves `--map mirage` etc. to the
+   workshop ID (`cs2_prophunt_workshop_id` in `bin/_lib.sh`). The old
+   plugin files are still on the persistent volume, and MultiAddonManager's
+   vdf would get loaded by Metamod in the next matchzy session — so
+   `pre.sh` prunes them every boot, mods on or off.
 
 **Verify:**
 - [x] Server console: `meta list` shows Metamod (well — shows CounterStrikeSharp,
@@ -272,7 +285,24 @@ the online one directly.
       on the same volume.
 - [x] In-game: connected, became a prop automatically (hiders don't see their
       own transform in first-person — normal), `.swap` cycles between the 6
-      real prop models. Confirmed live, in-game.
+      real prop models. Confirmed live, in-game. *(Step 7's plugin — superseded
+      by step 8, checks below.)*
+- [ ] Pinned image has the workshop vars (checked on `main`, not the pinned
+      digest): `docker run --rm --entrypoint grep joedwards32/cs2@sha256:<pinned> -n WORKSHOP /etc/entry.sh`.
+      If missing, bump the image digest first.
+- [ ] `gameday up --mode prophunt --format 3v3 -y`: collection downloads,
+      server starts on Prophunt Mirage, log shows `CS2_MODS=0 — vanilla mode`.
+- [ ] In-game: spawn as a random prop, `R` rerolls, `!info` opens the menu,
+      seekers released after 60 s.
+- [ ] Game type: does the casual ruleset suit the maps (round timer, team
+      balance, buy menu)? Adjust `game_modes.prophunt` in
+      `terraform/session/main.tf` if not.
+- [ ] Over `gameday rcon`: `ds_workshop_listmaps` / `ds_workshop_changelevel`
+      switches to Inferno; `say !config` lists/changes settings.
+- [ ] `down` then `up` again: are the maps cached on the data volume, or
+      re-downloaded? (Decides whether loading the whole collection is worth it.)
+- [ ] `up --mode matchzy` on the same volume: `meta list` shows no
+      MultiAddonManager, `css_plugins list` no PropHunt/CS2MenuManager.
 
 **Reality check:** budget ~1 h of maintenance after each **major** CS2 update — Metamod/CSSharp routinely need a rebuild. `--mode vanilla` is your safety valve. (This played out for real the same night — see the versions.lock note above.)
 

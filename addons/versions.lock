@@ -11,9 +11,6 @@
 #   metamod            https://www.sourcemm.net/downloads.php?branch=dev
 #   cssharp             https://github.com/roflmuffin/CounterStrikeSharp/releases
 #   matchzy             https://github.com/shobhit-pathak/MatchZy/releases
-#   multiaddonmanager  https://github.com/Source2ZE/MultiAddonManager/releases
-#   cs2menumanager      https://github.com/schwarper/CS2MenuManager/releases
-#   prophunt            https://github.com/exkludera-cssharp/PropHunt/releases
 #
 # Pinned 2026-10-02.
 
@@ -35,22 +32,3 @@ COUNTERSTRIKESHARP=v1.0.376           # with-runtime build
 COUNTERSTRIKESHARP_SHA256=8d50a25a467fe9c7ebbbc7032028d402cd428e118308f1c4d627a0a5ddf36783
 MATCHZY=0.8.15
 MATCHZY_SHA256=425955d7565df84915dd6002d0a7848546d3859d376cb493f2988ed182586b57
-
-# --- Prop Hunt stack (optional, extra weight on top of the above) ---
-# KNOWN BROKEN since the 2026-10-02 Metamod 1473 bump (MultiAddonManager v1.5.4
-# needs Metamod <= 1411). Not fixed on purpose: the prophunt mod is being replaced.
-# Each of these pins its own compatible Metamod ceiling — cross-checked against
-# METAMOD_BUILD=1411 above before pinning:
-#   multiaddonmanager v1.6 requires Metamod 1459+ (incompatible with us) — v1.5.4
-#     explicitly says "Metamod 2.0-1411 or earlier is required!", exact match.
-#   cs2menumanager needs a CSSharp with a .NET 10 runtime — confirmed v1.0.374's
-#     with-runtime build actually bundles .NET 10.0.3 (its own README still says
-#     ".NET 8", that text is just stale).
-#   prophunt has had exactly one release ever (0.0.1, 2026-01-03) — least mature
-#     link in this chain, expect to actually debug this one.
-MULTIADDONMANAGER=v1.5.4              # steamrt3 build — Debian 12 base, not steamrt4 (newer-Linux-only)
-MULTIADDONMANAGER_SHA256=d4bf33889b0fc04d051eb0c38423cb1df058c17842bce1675b6b995df09ec6ee
-CS2MENUMANAGER=v1.0.43
-CS2MENUMANAGER_SHA256=4298588c37955704a206fe185cfddf1d422075e33be3aca7627cce92391ad013
-PROPHUNT=0.0.1
-PROPHUNT_SHA256=d13c107832f2055c5c22977f5b309d76cb6aba5c75650d7913cebc00363522d8

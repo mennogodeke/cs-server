@@ -62,3 +62,26 @@ cs2_default_format() {
     *)    echo "5v5" ;;
   esac
 }
+
+# cs2_prophunt_workshop_id NAME_OR_ID
+#   Prints the Steam Workshop ID of one of the cs_script Prophunt maps
+#   (collection 3692550841), or passes a raw numeric ID through. Anything
+#   else — official names like de_dust2 included, which are the plain maps
+#   without the game mode — prints the valid names and returns 1.
+cs2_prophunt_workshop_id() {
+  case "${1:-}" in
+    mirage)  echo "3615968422" ;;
+    inferno) echo "3608612434" ;;
+    office)  echo "3644811896" ;;
+    nuke)    echo "3711322683" ;;
+    dust2)   echo "3758986810" ;;
+    *)
+      if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+        echo "$1"
+      else
+        echo "unknown prophunt map: '${1:-}' (want mirage, inferno, office, nuke, dust2 or a workshop ID)" >&2
+        return 1
+      fi
+      ;;
+  esac
+}

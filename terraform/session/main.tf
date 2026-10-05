@@ -31,7 +31,9 @@ locals {
   # entry.sh: a non-empty alias wins (+game_alias); otherwise it passes
   # +game_type/+game_mode. matchzy runs the competitive ruleset (MatchZy
   # manages rounds/econ on top); prophunt runs on the more permissive casual
-  # ruleset since PropHunt manages its own round logic; vanilla defaults to
+  # ruleset since the maps' cs_script runs its own rounds (unverified whether
+  # the maps would prefer another game type) — its map/mapgroup here are
+  # unused, entry.sh ignores both once a workshop map is set; vanilla defaults to
   # competitive for plain play. Rush (added 2026-09-22) has no game_alias —
   # `game_alias rush` is "unknown" — only type 0 / mode 6 in gamemodes.txt,
   # with its own map group. Verified live on build 1.41.8.8.
@@ -43,6 +45,11 @@ locals {
   }
   game_mode = local.game_modes[var.mode]
   startmap  = var.map != "" ? var.map : local.game_mode.map
+
+  # The Prophunt maps' author's own collection of all five — loading it lets
+  # `ds_workshop_changelevel` switch maps mid-session. var.workshop_map
+  # (resolved by gameday from --map) picks the one to start on.
+  prophunt_collection = "3692550841"
 
   # Only matchzy mode installs MatchZy at all, so this only matters there —
   # autostart_mode 1 = match mode (waits for a real match via !ready /
@@ -70,9 +77,13 @@ locals {
     game_mode         = local.game_mode.mode
     mapgroup          = local.game_mode.mapgroup
     tv_delay          = var.tv_delay
-    # Rush runs mod-free: MatchZy's warmup/match configs would fight Rush's
-    # own scripted rounds.
-    mods          = contains(["vanilla", "rush"], var.mode) ? "0" : "1"
+    # Empty outside prophunt — entry.sh skips empty workshop vars.
+    workshop_map        = var.mode == "prophunt" ? var.workshop_map : ""
+    workshop_collection = var.mode == "prophunt" ? local.prophunt_collection : ""
+    # Rush and prophunt run mod-free: MatchZy's warmup/match configs would
+    # fight Rush's own scripted rounds, and the Prophunt maps carry their
+    # whole game mode in cs_script.
+    mods          = contains(["vanilla", "rush", "prophunt"], var.mode) ? "0" : "1"
     stack         = var.mode
     mode_cfg      = local.mode_cfg
     compose_yml   = file("${path.module}/../../compose/docker-compose.yml")
@@ -92,10 +103,6 @@ locals {
       ? file("${path.module}/../../cfg/matchzy/cssharp-admins.json")
       : file("${path.module}/../../cfg/matchzy/cssharp-admins.example.json")
     )
-    prophunt_de_dust2   = file("${path.module}/../../cfg/prophunt/de_dust2.txt")
-    prophunt_de_nuke    = file("${path.module}/../../cfg/prophunt/de_nuke.txt")
-    prophunt_de_inferno = file("${path.module}/../../cfg/prophunt/de_inferno.txt")
-    prophunt_de_cache   = file("${path.module}/../../cfg/prophunt/de_cache.txt")
   })
 }
 

@@ -5,7 +5,7 @@ after**, so you only ever pay for the hours you actually play. An hourly GitHub
 Actions **reaper** force-deletes anything left running by accident. Admin access
 (SSH, RCON) exists only over a **Tailscale**-only admin plane — there's no public
 SSH port at all — and every credential lives in **1Password**, pulled at boot,
-never committed. The mod stack (Metamod, CounterStrikeSharp, MatchZy/Prop Hunt)
+never committed. The mod stack (Metamod, CounterStrikeSharp, MatchZy)
 is version-**pinned** in [`addons/versions.lock`](addons/versions.lock) rather
 than tracking `latest`.
 
@@ -86,7 +86,7 @@ from the persistent volume:
 | `--mode` | What runs |
 |----------|-----------|
 | `matchzy` (default) | Metamod, CounterStrikeSharp, MatchZy — knife round, `!ready`, admin commands (`.map`, `.rcon`, etc.) |
-| `prophunt` | Metamod, CounterStrikeSharp, MultiAddonManager, CS2MenuManager, Prop Hunt |
+| `prophunt` | The community cs_script [Prophunt workshop maps](https://steamcommunity.com/sharedfiles/filedetails/?id=3692550841), no mods. `--map mirage\|inferno\|office\|nuke\|dust2` (default `mirage`) or a workshop ID. All five are loaded, so switch mid-session over RCON with `ds_workshop_listmaps` / `ds_workshop_changelevel <name>`; change game settings with `say !config <name> <value>` |
 | `vanilla` | No mods at all — plain CS2, the safety valve for when a CS2 patch breaks the mod stack |
 | `rush` | Valve's 3v3 Rush mode (game type 0 / mode 6, map `rush_001`), no mods. Defaults to `--format 3v3` and `--map rush_001` |
 
@@ -170,5 +170,5 @@ The full phased plan — goals, commands, verify steps, known issues — is in
 | 2–3 | ✅ First session boots, friends connect; fast reboot + format knobs |
 | 4 | ✅ Reaper live in CI |
 | 5–6 | ✅ Harden SSH/RCON (Tailscale, no public SSH port); secrets to 1Password |
-| 7 | ✅ MatchZy and Prop Hunt as mutually exclusive `--mode` stacks, with a vanilla fallback (`retake` mode not wired up yet) |
+| 7 | ✅ MatchZy and Prop Hunt as mutually exclusive `--mode` stacks, with a vanilla fallback (`retake` mode not wired up yet). Prop Hunt since moved from a plugin to the cs_script workshop maps — live test pending |
 | 8–10 | Demo retention; remote state + phone trigger; operate |

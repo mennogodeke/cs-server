@@ -25,6 +25,9 @@ jobs:
           terraform init -backend=false -input=false
           terraform validate
         working-directory: terraform/session
+      - name: test session
+        run: terraform test
+        working-directory: terraform/session
 
   shell:
     runs-on: ubuntu-latest

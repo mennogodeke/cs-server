@@ -43,10 +43,6 @@ services:
       # the directories it creates are owned correctly. See pre.sh.
       - ./cfg/matchzy/admins.json:/home/steam/cs2-dedicated/matchzy-admins.json:ro
       - ./cfg/matchzy/cssharp-admins.json:/home/steam/cs2-dedicated/cssharp-admins.json:ro
-      - ./cfg/prophunt/de_dust2.txt:/home/steam/cs2-dedicated/prophunt-de_dust2.txt:ro
-      - ./cfg/prophunt/de_nuke.txt:/home/steam/cs2-dedicated/prophunt-de_nuke.txt:ro
-      - ./cfg/prophunt/de_inferno.txt:/home/steam/cs2-dedicated/prophunt-de_inferno.txt:ro
-      - ./cfg/prophunt/de_cache.txt:/home/steam/cs2-dedicated/prophunt-de_cache.txt:ro
     ulimits:
       nofile:
         soft: 1048576

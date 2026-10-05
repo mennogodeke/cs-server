@@ -48,13 +48,24 @@ variable "map" {
 }
 
 variable "mode" {
-  description = "Which mod stack to run: matchzy (competitive, knife rounds etc) | prophunt | vanilla (no mods) | rush (Valve's 3v3 Rush, no mods). Mutually exclusive — switching modes prunes the other stack's plugins from the persistent volume."
+  description = "Which mod stack to run: matchzy (competitive, knife rounds etc) | prophunt (cs_script Prophunt workshop maps, no mods) | vanilla (no mods) | rush (Valve's 3v3 Rush, no mods). Mutually exclusive — switching modes prunes the other stack's plugins from the persistent volume."
   type        = string
   default     = "matchzy"
 
   validation {
     condition     = contains(["matchzy", "prophunt", "vanilla", "rush"], var.mode)
     error_message = "mode must be one of: matchzy, prophunt, vanilla, rush."
+  }
+}
+
+variable "workshop_map" {
+  description = "Steam Workshop map ID to start on. Required for mode prophunt (gameday resolves --map mirage etc. to an ID); ignored otherwise."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = can(regex("^[0-9]*$", var.workshop_map)) && (var.mode != "prophunt" || var.workshop_map != "")
+    error_message = "workshop_map must be a numeric Steam Workshop ID, and is required when mode is prophunt."
   }
 }
 

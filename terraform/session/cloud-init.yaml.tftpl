@@ -46,26 +46,6 @@ write_files:
     content: |
       ${indent(6, cssharp_admins)}
 
-  - path: /opt/cs2/cfg/prophunt/de_dust2.txt
-    permissions: "0644"
-    content: |
-      ${indent(6, prophunt_de_dust2)}
-
-  - path: /opt/cs2/cfg/prophunt/de_nuke.txt
-    permissions: "0644"
-    content: |
-      ${indent(6, prophunt_de_nuke)}
-
-  - path: /opt/cs2/cfg/prophunt/de_inferno.txt
-    permissions: "0644"
-    content: |
-      ${indent(6, prophunt_de_inferno)}
-
-  - path: /opt/cs2/cfg/prophunt/de_cache.txt
-    permissions: "0644"
-    content: |
-      ${indent(6, prophunt_de_cache)}
-
   - path: /opt/cs2/.env
     permissions: "0600"
     content: |
@@ -79,6 +59,8 @@ write_files:
       CS2_GAMETYPE=${game_type}
       CS2_GAMEMODE=${game_mode}
       CS2_MAPGROUP=${mapgroup}
+      CS2_HOST_WORKSHOP_MAP=${workshop_map}
+      CS2_HOST_WORKSHOP_COLLECTION=${workshop_collection}
       CS2_TV_DELAY=${tv_delay}
       CS2_MODS=${mods}
       GAMEDAY_STACK=${stack}

@@ -4,6 +4,7 @@
 #   gameday bootstrap [-- <terraform apply args>]   one-time: reserved IP, firewall, volume
 #   gameday up   [--format 5v5] [--map de_anubis] [--mode matchzy|prophunt|vanilla|rush] [-y]
 #                rush defaults to --format 3v3 --map rush_001
+#                prophunt takes --map mirage|inferno|office|nuke|dust2 (default mirage) or a workshop ID
 #   gameday down [-y]
 #   gameday status
 #   gameday connect
@@ -25,7 +26,7 @@ source "$HERE/_lib.sh"
 BOOTSTRAP_DIR="$ROOT/terraform/bootstrap"
 SESSION_DIR="$ROOT/terraform/session"
 
-usage() { sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 load_secrets() {
   case "${CS2_SECRET_SOURCE:-tfvars}" in
@@ -82,13 +83,22 @@ cmd_up() {
   local maxplayers
   maxplayers="$(cs2_parse_format "$format")" || exit 1
 
+  # Prophunt maps are workshop items: resolve --map to an ID here, before
+  # Terraform, and leave the regular start map to the mode default.
+  local workshop_map="" map_label="${map:-<mode default>}"
+  if [[ "$mode" == "prophunt" ]]; then
+    workshop_map="$(cs2_prophunt_workshop_id "${map:-mirage}")" || exit 1
+    map_label="${map:-mirage} (workshop $workshop_map)"
+    map=""
+  fi
+
   cs2_need terraform
   load_secrets
   # An empty map lets Terraform pick the mode's default (rush_001 / de_anubis).
-  cs2_log "$format -> $maxplayers slots | map ${map:-<mode default>} | mode $mode"
+  cs2_log "$format -> $maxplayers slots | map $map_label | mode $mode"
   terraform -chdir="$SESSION_DIR" init -input=false
   terraform -chdir="$SESSION_DIR" apply "${tf_extra[@]+"${tf_extra[@]}"}" \
-    -var "format=$format" -var "map=$map" -var "mode=$mode"
+    -var "format=$format" -var "map=$map" -var "mode=$mode" -var "workshop_map=$workshop_map"
 
   cs2_log "server up — connect string:"
   terraform -chdir="$SESSION_DIR" output -raw connect && echo
